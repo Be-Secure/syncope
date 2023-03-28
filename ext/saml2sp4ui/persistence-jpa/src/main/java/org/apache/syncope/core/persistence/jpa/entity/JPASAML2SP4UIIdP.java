@@ -19,28 +19,28 @@
 package org.apache.syncope.core.persistence.jpa.entity;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import jakarta.persistence.Basic;
+import jakarta.persistence.Cacheable;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.Lob;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.PostLoad;
+import jakarta.persistence.PostPersist;
+import jakarta.persistence.PostUpdate;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+import jakarta.validation.constraints.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import javax.persistence.Basic;
-import javax.persistence.Cacheable;
-import javax.persistence.CascadeType;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.FetchType;
-import javax.persistence.JoinColumn;
-import javax.persistence.JoinTable;
-import javax.persistence.Lob;
-import javax.persistence.ManyToMany;
-import javax.persistence.OneToOne;
-import javax.persistence.PostLoad;
-import javax.persistence.PostPersist;
-import javax.persistence.PostUpdate;
-import javax.persistence.PrePersist;
-import javax.persistence.PreUpdate;
-import javax.persistence.Table;
-import javax.persistence.Transient;
-import javax.validation.constraints.NotNull;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.syncope.common.lib.to.Item;
 import org.apache.syncope.common.lib.types.SAML2BindingType;
@@ -71,14 +71,11 @@ public class JPASAML2SP4UIIdP extends AbstractGeneratedKeyEntity implements SAML
     @Basic(fetch = FetchType.EAGER)
     private Byte[] metadata;
 
+    @Column(nullable = false)
+    private SAML2BindingType bindingType;
+
     @NotNull
     private Boolean logoutSupported = false;
-
-    @Lob
-    private String items;
-
-    @Transient
-    private final List<Item> itemList = new ArrayList<>();
 
     @NotNull
     private Boolean createUnmatching = false;
@@ -89,11 +86,14 @@ public class JPASAML2SP4UIIdP extends AbstractGeneratedKeyEntity implements SAML
     @NotNull
     private Boolean updateMatching = false;
 
-    @Column(nullable = false)
-    private SAML2BindingType bindingType;
-
     @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER, mappedBy = "idp")
     private JPASAML2SP4UIUserTemplate userTemplate;
+
+    @Lob
+    private String items;
+
+    @Transient
+    private final List<Item> itemList = new ArrayList<>();
 
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(name = "SAML2IdP4UIAction",

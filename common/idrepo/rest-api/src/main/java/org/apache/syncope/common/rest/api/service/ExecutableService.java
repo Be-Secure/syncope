@@ -20,27 +20,26 @@ package org.apache.syncope.common.rest.api.service;
 
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import jakarta.ws.rs.BeanParam;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.DefaultValue;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import java.util.List;
-import javax.validation.constraints.Min;
-import javax.validation.constraints.NotNull;
-import javax.ws.rs.BeanParam;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.DefaultValue;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import org.apache.syncope.common.lib.to.ExecTO;
 import org.apache.syncope.common.lib.to.JobTO;
 import org.apache.syncope.common.lib.to.PagedResult;
 import org.apache.syncope.common.lib.types.JobAction;
 import org.apache.syncope.common.rest.api.RESTHeaders;
-import org.apache.syncope.common.rest.api.beans.ExecDeleteQuery;
-import org.apache.syncope.common.rest.api.beans.ExecListQuery;
+import org.apache.syncope.common.rest.api.beans.ExecQuery;
 import org.apache.syncope.common.rest.api.beans.ExecSpecs;
 
 public interface ExecutableService extends JAXRSService {
@@ -54,7 +53,7 @@ public interface ExecutableService extends JAXRSService {
     @GET
     @Path("{key}/executions")
     @Produces({ MediaType.APPLICATION_JSON, RESTHeaders.APPLICATION_YAML, MediaType.APPLICATION_XML })
-    PagedResult<ExecTO> listExecutions(@BeanParam ExecListQuery query);
+    PagedResult<ExecTO> listExecutions(@BeanParam ExecQuery query);
 
     /**
      * Returns the list of recently completed executions, ordered by end date descendent.
@@ -91,7 +90,7 @@ public interface ExecutableService extends JAXRSService {
                     description = "Batch results available, returned as Response entity"))
     @Path("{key}/executions")
     @Produces(RESTHeaders.MULTIPART_MIXED)
-    Response deleteExecutions(@BeanParam ExecDeleteQuery query);
+    Response deleteExecutions(@BeanParam ExecQuery query);
 
     /**
      * Executes the executable matching the given specs.

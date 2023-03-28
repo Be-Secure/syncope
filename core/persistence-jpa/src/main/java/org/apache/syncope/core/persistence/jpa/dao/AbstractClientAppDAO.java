@@ -18,8 +18,8 @@
  */
 package org.apache.syncope.core.persistence.jpa.dao;
 
+import jakarta.persistence.TypedQuery;
 import java.util.List;
-import javax.persistence.TypedQuery;
 import org.apache.syncope.core.persistence.api.dao.ClientAppDAO;
 import org.apache.syncope.core.persistence.api.entity.Realm;
 import org.apache.syncope.core.persistence.api.entity.am.ClientApp;
@@ -27,6 +27,7 @@ import org.apache.syncope.core.persistence.api.entity.policy.AccessPolicy;
 import org.apache.syncope.core.persistence.api.entity.policy.AttrReleasePolicy;
 import org.apache.syncope.core.persistence.api.entity.policy.AuthPolicy;
 import org.apache.syncope.core.persistence.api.entity.policy.Policy;
+import org.apache.syncope.core.persistence.api.entity.policy.TicketExpirationPolicy;
 
 public abstract class AbstractClientAppDAO<C extends ClientApp> extends AbstractDAO<C> implements ClientAppDAO<C> {
 
@@ -44,6 +45,8 @@ public abstract class AbstractClientAppDAO<C extends ClientApp> extends Abstract
             query.append("accessPolicy");
         } else if (AttrReleasePolicy.class.isAssignableFrom(policyClass)) {
             query.append("attrReleasePolicy");
+        } else if (TicketExpirationPolicy.class.isAssignableFrom(policyClass)) {
+            query.append("ticketExpirationPolicy");
         }
 
         return query;

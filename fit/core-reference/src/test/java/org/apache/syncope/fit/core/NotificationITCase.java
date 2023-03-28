@@ -24,8 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import jakarta.ws.rs.core.Response;
 import java.util.List;
-import javax.ws.rs.core.Response;
 import org.apache.syncope.client.lib.SyncopeClient;
 import org.apache.syncope.common.lib.SyncopeClientException;
 import org.apache.syncope.common.lib.to.NotificationTO;
@@ -58,8 +58,7 @@ public class NotificationITCase extends AbstractITCase {
 
     @Test
     public void read() {
-        NotificationTO notificationTO = NOTIFICATION_SERVICE.read(
-                "9e2b911c-25de-4c77-bcea-b86ed9451050");
+        NotificationTO notificationTO = NOTIFICATION_SERVICE.read("9e2b911c-25de-4c77-bcea-b86ed9451050");
         assertNotNull(notificationTO);
     }
 

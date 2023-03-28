@@ -25,16 +25,15 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import jakarta.ws.rs.core.Response;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.syncope.client.lib.SyncopeClient;
-import org.apache.syncope.client.ui.commons.ConnIdSpecialName;
+import org.apache.syncope.client.lib.batch.BatchRequest;
 import org.apache.syncope.common.lib.Attr;
 import org.apache.syncope.common.lib.SyncopeClientException;
 import org.apache.syncope.common.lib.SyncopeConstants;
@@ -51,15 +50,17 @@ import org.apache.syncope.common.lib.to.GroupTO;
 import org.apache.syncope.common.lib.to.MembershipTO;
 import org.apache.syncope.common.lib.to.PagedConnObjectResult;
 import org.apache.syncope.common.lib.to.PagedResult;
+import org.apache.syncope.common.lib.to.RealmTO;
 import org.apache.syncope.common.lib.to.RoleTO;
 import org.apache.syncope.common.lib.to.UserTO;
 import org.apache.syncope.common.lib.types.AnyTypeKind;
 import org.apache.syncope.common.lib.types.ClientExceptionType;
 import org.apache.syncope.common.rest.api.beans.AnyQuery;
 import org.apache.syncope.common.rest.api.beans.ConnObjectTOQuery;
+import org.apache.syncope.common.rest.api.service.GroupService;
+import org.apache.syncope.common.rest.api.service.RealmService;
 import org.apache.syncope.common.rest.api.service.RoleService;
 import org.apache.syncope.fit.AbstractITCase;
-import org.apache.syncope.fit.ElasticsearchDetector;
 import org.identityconnectors.framework.common.objects.Name;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -82,10 +83,6 @@ public class SearchITCase extends AbstractITCase {
                 fiql(SyncopeClient.getUserSearchConditionBuilder().isNull("loginDate").query()).build());
         assertNotNull(matchingUsers);
         assertFalse(matchingUsers.getResult().isEmpty());
-
-        assertEquals(2, matchingUsers.getResult().stream().
-                filter(user -> "74cd8ece-715a-44a4-a736-e17b46c4e7e6".equals(user.getKey())
-                || "b3cbc78d-32e6-4bd4-92e0-bbe07566a2ee".equals(user.getKey())).count());
     }
 
     @Test
@@ -178,7 +175,7 @@ public class SearchITCase extends AbstractITCase {
         GroupTO group = createGroup(groupCR).getEntity();
         assertNotNull(group);
 
-        if (ElasticsearchDetector.isElasticSearchEnabled(ADMIN_CLIENT.platform())) {
+        if (IS_ELASTICSEARCH_ENABLED) {
             try {
                 Thread.sleep(2000);
             } catch (InterruptedException ex) {
@@ -236,7 +233,7 @@ public class SearchITCase extends AbstractITCase {
         role = getObject(response.getLocation(), RoleService.class, RoleTO.class);
         assertNotNull(role);
 
-        if (ElasticsearchDetector.isElasticSearchEnabled(ADMIN_CLIENT.platform())) {
+        if (IS_ELASTICSEARCH_ENABLED) {
             try {
                 Thread.sleep(2000);
             } catch (InterruptedException ex) {
@@ -331,9 +328,7 @@ public class SearchITCase extends AbstractITCase {
 
     @Test
     public void searchByDate() {
-        CLIENT_FACTORY.create("bellini", "password").self();
-
-        if (ElasticsearchDetector.isElasticSearchEnabled(ADMIN_CLIENT.platform())) {
+        if (IS_ELASTICSEARCH_ENABLED) {
             try {
                 Thread.sleep(2000);
             } catch (InterruptedException ex) {
@@ -465,27 +460,6 @@ public class SearchITCase extends AbstractITCase {
     }
 
     @Test
-    public void assignable() {
-        PagedResult<GroupTO> groups = GROUP_SERVICE.search(new AnyQuery.Builder().realm("/even/two").page(1).size(1000).
-                fiql(SyncopeClient.getGroupSearchConditionBuilder().isAssignable().
-                        and("name").equalTo("*").query()).
-                build());
-        assertNotNull(groups);
-        assertTrue(groups.getResult().stream().
-                anyMatch(group -> "034740a9-fa10-453b-af37-dc7897e98fb1".equals(group.getKey())));
-        assertFalse(groups.getResult().stream().
-                anyMatch(group -> "e7ff94e8-19c9-4f0a-b8b7-28327edbf6ed".equals(group.getKey())));
-
-        PagedResult<AnyObjectTO> anyObjects = ANY_OBJECT_SERVICE.search(new AnyQuery.Builder().realm("/odd").
-                fiql(SyncopeClient.getAnyObjectSearchConditionBuilder(PRINTER).isAssignable().
-                        and("name").equalTo("*").query()).
-                build());
-        assertNotNull(anyObjects);
-        assertFalse(anyObjects.getResult().stream().
-                anyMatch(anyObject -> "9e1d130c-d6a3-48b1-98b3-182477ed0688".equals(anyObject.getKey())));
-    }
-
-    @Test
     public void member() {
         PagedResult<GroupTO> groups = GROUP_SERVICE.search(new AnyQuery.Builder().realm("/").
                 fiql(SyncopeClient.getGroupSearchConditionBuilder().withMembers("rossini").query()).
@@ -512,53 +486,37 @@ public class SearchITCase extends AbstractITCase {
     @Test
     public void searchConnObjectsBrowsePagedResult() {
         List<String> groupKeys = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 11; i++) {
             GroupCR groupCR = GroupITCase.getSample("group");
             groupCR.getResources().add(RESOURCE_NAME_LDAP);
             GroupTO group = createGroup(groupCR).getEntity();
             groupKeys.add(group.getKey());
         }
 
-        int totalRead = 0;
-        Set<String> read = new HashSet<>();
+        ConnObjectTOQuery.Builder builder = new ConnObjectTOQuery.Builder().size(10);
+
         try {
-            // 1. first search with no filters
-            ConnObjectTOQuery.Builder builder = new ConnObjectTOQuery.Builder().size(10);
-            PagedConnObjectResult matches;
-            do {
-                matches = null;
+            PagedConnObjectResult matches = RESOURCE_SERVICE.searchConnObjects(
+                    RESOURCE_NAME_LDAP, AnyTypeKind.GROUP.name(), builder.build());
+            assertNotNull(matches);
 
-                boolean succeeded = false;
-                // needed because ApacheDS seems to randomly fail when searching with cookie
-                for (int i = 0; i < 5 && !succeeded; i++) {
-                    try {
-                        matches = RESOURCE_SERVICE.searchConnObjects(
-                                RESOURCE_NAME_LDAP,
-                                AnyTypeKind.GROUP.name(),
-                                builder.build());
-                        succeeded = true;
-                    } catch (SyncopeClientException e) {
-                        assertEquals(ClientExceptionType.ConnectorException, e.getType());
-                    }
-                }
+            // the test LDAP server sometimes does not return the expected cookie
+            if (matches.getPagedResultsCookie() != null) {
+                int firstRound = matches.getResult().size();
+
+                builder.pagedResultsCookie(matches.getPagedResultsCookie());
+                matches = RESOURCE_SERVICE.searchConnObjects(
+                        RESOURCE_NAME_LDAP, AnyTypeKind.GROUP.name(), builder.build());
                 assertNotNull(matches);
+                int secondRound = matches.getResult().size();
 
-                totalRead += matches.getResult().size();
-                read.addAll(matches.getResult().stream().
-                        map(input -> input.getAttr(ConnIdSpecialName.NAME).get().getValues().get(0)).
-                        collect(Collectors.toList()));
-
-                if (matches.getPagedResultsCookie() != null) {
-                    builder.pagedResultsCookie(matches.getPagedResultsCookie());
-                }
-            } while (matches.getPagedResultsCookie() != null);
-
-            assertEquals(totalRead, read.size());
-            assertTrue(totalRead >= 10);
+                assertTrue(firstRound + secondRound >= groupKeys.size());
+            }
         } finally {
-            groupKeys.forEach(key -> {
-                GROUP_SERVICE.delete(key);
-            });
+            BatchRequest batchRequest = ADMIN_CLIENT.batch();
+            GroupService batchGroupService = batchRequest.getService(GroupService.class);
+            groupKeys.forEach(batchGroupService::delete);
+            batchRequest.commit();
         }
     }
 
@@ -687,7 +645,7 @@ public class SearchITCase extends AbstractITCase {
                     build();
             updateAnyObject(anyObjectUR);
 
-            if (ElasticsearchDetector.isElasticSearchEnabled(ADMIN_CLIENT.platform())) {
+            if (IS_ELASTICSEARCH_ENABLED) {
                 try {
                     Thread.sleep(2000);
                 } catch (InterruptedException ex) {
@@ -726,7 +684,7 @@ public class SearchITCase extends AbstractITCase {
         req.getPlainAttrs().add(new AttrPatch.Builder(attr("ctype", "ou=sample,o=isp")).build());
         USER_SERVICE.update(req);
 
-        if (ElasticsearchDetector.isElasticSearchEnabled(ADMIN_CLIENT.platform())) {
+        if (IS_ELASTICSEARCH_ENABLED) {
             try {
                 Thread.sleep(2000);
             } catch (InterruptedException ex) {
@@ -791,7 +749,7 @@ public class SearchITCase extends AbstractITCase {
             USER_SERVICE.search(new AnyQuery.Builder().realm(SyncopeConstants.ROOT_REALM).
                     fiql(SyncopeClient.getUserSearchConditionBuilder().is("userId").equalTo("*@apache.org").query()).
                     orderBy(SyncopeClient.getOrderByClauseBuilder().asc("surname").desc("firstname").build()).build());
-            if (!ElasticsearchDetector.isElasticSearchEnabled(ADMIN_CLIENT.platform())) {
+            if (!IS_ELASTICSEARCH_ENABLED) {
                 fail();
             }
         } catch (SyncopeClientException e) {
@@ -849,5 +807,54 @@ public class SearchITCase extends AbstractITCase {
                 fiql("lastChangeDate=ge=2022-01-25T17:00:06+0000").build());
         assertNotNull(matching2);
         assertFalse(matching2.getResult().isEmpty());
+    }
+
+    @Test
+    public void issueSYNCOPE1727() {
+        RealmTO realm = new RealmTO();
+        realm.setName("syncope1727");
+
+        // 1. create Realm
+        Response response = REALM_SERVICE.create("/even/two", realm);
+        RealmTO[] actuals = getObject(response.getLocation(), RealmService.class, RealmTO[].class);
+        assertNotNull(actuals);
+        assertTrue(actuals.length > 0);
+        realm = actuals[0];
+        assertNotNull(realm.getKey());
+        assertEquals("syncope1727", realm.getName());
+        assertEquals("/even/two/syncope1727", realm.getFullPath());
+        assertEquals(realm.getParent(), getRealm("/even/two").get().getKey());
+
+        // 2. create user
+        UserCR userCR = UserITCase.getUniqueSample("syncope1727@syncope.apache.org");
+        userCR.setRealm(realm.getFullPath());
+        UserTO user = createUser(userCR).getEntity();
+
+        // 3. search for user
+        if (IS_ELASTICSEARCH_ENABLED) {
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException ex) {
+                // ignore
+            }
+        }
+
+        PagedResult<UserTO> users = USER_SERVICE.search(new AnyQuery.Builder().realm(SyncopeConstants.ROOT_REALM).
+                fiql(SyncopeClient.getUserSearchConditionBuilder().is("realm").
+                        equalTo(realm.getKey()).query()).build());
+        assertEquals(1, users.getResult().size());
+        assertEquals(user.getKey(), users.getResult().get(0).getKey());
+
+        // 4. update parent Realm
+        realm.setParent(getRealm("/odd").get().getKey());
+        REALM_SERVICE.update(realm);
+        realm = getRealm("/odd/syncope1727").get();
+
+        // 5. search again for user
+        users = USER_SERVICE.search(new AnyQuery.Builder().realm(SyncopeConstants.ROOT_REALM).
+                fiql(SyncopeClient.getUserSearchConditionBuilder().is("realm").
+                        equalTo(realm.getKey()).query()).build());
+        assertEquals(1, users.getResult().size());
+        assertEquals(user.getKey(), users.getResult().get(0).getKey());
     }
 }

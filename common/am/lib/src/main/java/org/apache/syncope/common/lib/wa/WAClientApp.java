@@ -21,13 +21,12 @@ package org.apache.syncope.common.lib.wa;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.apache.syncope.common.lib.BaseBean;
 import org.apache.syncope.common.lib.policy.AccessPolicyTO;
 import org.apache.syncope.common.lib.policy.AttrReleasePolicyTO;
 import org.apache.syncope.common.lib.policy.AuthPolicyTO;
+import org.apache.syncope.common.lib.policy.TicketExpirationPolicyTO;
 import org.apache.syncope.common.lib.to.AuthModuleTO;
 import org.apache.syncope.common.lib.to.ClientAppTO;
 
@@ -45,7 +44,7 @@ public class WAClientApp implements BaseBean {
 
     private AttrReleasePolicyTO attrReleasePolicy;
 
-    private final Map<String, Object> releaseAttrs = new HashMap<>();
+    private TicketExpirationPolicyTO ticketExpirationPolicy;
 
     public ClientAppTO getClientAppTO() {
         return clientAppTO;
@@ -85,7 +84,11 @@ public class WAClientApp implements BaseBean {
         this.attrReleasePolicy = attrReleasePolicy;
     }
 
-    public Map<String, Object> getReleaseAttrs() {
-        return releaseAttrs;
+    public TicketExpirationPolicyTO getTicketExpirationPolicy() {
+        return ticketExpirationPolicy;
+    }
+
+    public void setTicketExpirationPolicy(final TicketExpirationPolicyTO ticketExpirationPolicy) {
+        this.ticketExpirationPolicy = ticketExpirationPolicy;
     }
 }

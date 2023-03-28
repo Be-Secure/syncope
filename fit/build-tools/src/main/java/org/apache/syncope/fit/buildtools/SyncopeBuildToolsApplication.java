@@ -18,13 +18,13 @@
  */
 package org.apache.syncope.fit.buildtools;
 
-import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
+import com.fasterxml.jackson.jakarta.rs.json.JacksonJsonProvider;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletRegistration;
+import jakarta.xml.ws.Endpoint;
 import java.util.List;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRegistration;
 import javax.sql.DataSource;
-import javax.xml.ws.Endpoint;
 import net.tirasa.connid.bundles.soap.provisioning.interfaces.Provisioning;
 import org.apache.cxf.Bus;
 import org.apache.cxf.endpoint.Server;
@@ -81,8 +81,7 @@ public class SyncopeBuildToolsApplication extends SpringBootServletInitializer {
     }
 
     @Bean
-    public Endpoint soapProvisioning(final Provisioning provisioning,
-                                     final Bus bus) {
+    public Endpoint soapProvisioning(final Provisioning provisioning, final Bus bus) {
         EndpointImpl soapProvisioning = new EndpointImpl(provisioning);
         soapProvisioning.setBus(bus);
         soapProvisioning.publish("/soap");
@@ -100,8 +99,12 @@ public class SyncopeBuildToolsApplication extends SpringBootServletInitializer {
     }
 
     @Bean
-    public Server restProvisioning(final GreenMailService greenMailService, final UserService userService,
-                                   final ApplicationContext ctx, final Bus bus) {
+    public Server restProvisioning(
+            final GreenMailService greenMailService,
+            final UserService userService,
+            final ApplicationContext ctx,
+            final Bus bus) {
+
         SpringJAXRSServerFactoryBean restProvisioning = new SpringJAXRSServerFactoryBean();
         restProvisioning.setApplicationContext(ctx);
         restProvisioning.setBus(bus);
@@ -115,12 +118,10 @@ public class SyncopeBuildToolsApplication extends SpringBootServletInitializer {
     @Override
     public void onStartup(final ServletContext sc) throws ServletException {
         sc.addListener(new ConnectorServerStartStopListener());
-        sc.addListener(new ApacheDSStartStopListener());
+        sc.addListener(new LDAPStartStopListener());
         sc.addListener(new H2StartStopListener());
         sc.addListener(new GreenMailStartStopListener());
 
-        ServletRegistration.Dynamic apacheDS = sc.addServlet("ApacheDSRootDseServlet", ApacheDSRootDseServlet.class);
-        apacheDS.addMapping("/apacheDS");
         ServletRegistration.Dynamic sts = sc.addServlet("ServiceTimeoutServlet", ServiceTimeoutServlet.class);
         sts.addMapping("/services/*");
 

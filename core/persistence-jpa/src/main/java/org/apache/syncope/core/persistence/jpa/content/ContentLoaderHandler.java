@@ -18,14 +18,15 @@
  */
 package org.apache.syncope.core.persistence.jpa.content;
 
+import jakarta.xml.bind.DatatypeConverter;
 import java.sql.Types;
 import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import javax.sql.DataSource;
-import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.text.StringEscapeUtils;
 import org.apache.commons.text.StringSubstitutor;
 import org.apache.syncope.core.provisioning.api.utils.FormatUtils;
 import org.slf4j.Logger;
@@ -43,6 +44,8 @@ import org.xml.sax.helpers.DefaultHandler;
 public class ContentLoaderHandler extends DefaultHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(ContentLoaderHandler.class);
+
+    private static final String CONF_DIR = "syncope.conf.dir";
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -65,6 +68,9 @@ public class ContentLoaderHandler extends DefaultHandler {
         this.continueOnError = continueOnError;
         this.paramSubstitutor = new StringSubstitutor(key -> {
             String value = env.getProperty(key, fetches.get(key));
+            if (value != null && CONF_DIR.equals(key)) {
+                value = value.replace('\\', '/');
+            }
             return StringUtils.isBlank(value) ? null : value;
         });
     }
@@ -92,6 +98,7 @@ public class ContentLoaderHandler extends DefaultHandler {
                 LOG.warn("Variable ${} could not be resolved", attrs.getValue(i));
                 value = attrs.getValue(i);
             }
+            value = StringEscapeUtils.unescapeXml(value);
 
             switch (colType) {
                 case Types.INTEGER:

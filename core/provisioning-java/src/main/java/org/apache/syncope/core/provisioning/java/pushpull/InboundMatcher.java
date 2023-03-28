@@ -37,8 +37,6 @@ import org.apache.syncope.core.persistence.api.dao.AnyObjectDAO;
 import org.apache.syncope.core.persistence.api.dao.AnySearchDAO;
 import org.apache.syncope.core.persistence.api.dao.GroupDAO;
 import org.apache.syncope.core.persistence.api.dao.ImplementationDAO;
-import org.apache.syncope.core.persistence.api.dao.PullCorrelationRule;
-import org.apache.syncope.core.persistence.api.dao.PullMatch;
 import org.apache.syncope.core.persistence.api.dao.RealmDAO;
 import org.apache.syncope.core.persistence.api.dao.UserDAO;
 import org.apache.syncope.core.persistence.api.dao.VirSchemaDAO;
@@ -63,6 +61,8 @@ import org.apache.syncope.core.provisioning.api.IntAttrName;
 import org.apache.syncope.core.provisioning.api.IntAttrNameParser;
 import org.apache.syncope.core.provisioning.api.VirAttrHandler;
 import org.apache.syncope.core.provisioning.api.data.ItemTransformer;
+import org.apache.syncope.core.provisioning.api.rules.PullCorrelationRule;
+import org.apache.syncope.core.provisioning.api.rules.PullMatch;
 import org.apache.syncope.core.provisioning.java.utils.MappingUtils;
 import org.apache.syncope.core.spring.implementation.ImplementationManager;
 import org.identityconnectors.framework.common.objects.Attribute;
@@ -151,24 +151,28 @@ public class InboundMatcher {
 
         List<ConnectorObject> found = new ArrayList<>();
 
-        Name nameAttr = new Name(nameValue);
-        connector.search(
-                new ObjectClass(provision.get().getObjectClass()),
-                provision.get().isIgnoreCaseMatch()
-                ? FilterBuilder.equalsIgnoreCase(nameAttr)
-                : FilterBuilder.equalTo(nameAttr),
-                new SearchResultsHandler() {
+        try {
+            Name nameAttr = new Name(nameValue);
+            connector.search(
+                    new ObjectClass(provision.get().getObjectClass()),
+                    provision.get().isIgnoreCaseMatch()
+                    ? FilterBuilder.equalsIgnoreCase(nameAttr)
+                    : FilterBuilder.equalTo(nameAttr),
+                    new SearchResultsHandler() {
 
-            @Override
-            public void handleResult(final SearchResult result) {
-                // nothing to do
-            }
+                @Override
+                public void handleResult(final SearchResult result) {
+                    // nothing to do
+                }
 
-            @Override
-            public boolean handle(final ConnectorObject connectorObject) {
-                return found.add(connectorObject);
-            }
-        }, MappingUtils.buildOperationOptions(mapItems));
+                @Override
+                public boolean handle(final ConnectorObject connectorObject) {
+                    return found.add(connectorObject);
+                }
+            }, MappingUtils.buildOperationOptions(mapItems));
+        } catch (Throwable t) {
+            LOG.warn("While searching for {} ...", nameValue, t);
+        }
 
         Optional<PullMatch> result = Optional.empty();
 

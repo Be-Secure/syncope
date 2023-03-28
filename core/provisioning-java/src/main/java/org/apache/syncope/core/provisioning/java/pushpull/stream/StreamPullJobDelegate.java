@@ -33,6 +33,7 @@ import org.apache.syncope.common.lib.types.ConflictResolutionAction;
 import org.apache.syncope.common.lib.types.IdMImplementationType;
 import org.apache.syncope.common.lib.types.MappingPurpose;
 import org.apache.syncope.common.lib.types.PullMode;
+import org.apache.syncope.common.lib.types.TaskType;
 import org.apache.syncope.core.persistence.api.dao.ImplementationDAO;
 import org.apache.syncope.core.persistence.api.dao.RealmDAO;
 import org.apache.syncope.core.persistence.api.entity.AnyType;
@@ -164,24 +165,25 @@ public class StreamPullJobDelegate extends PullJobDelegate implements SyncopeStr
 
         LOG.debug("Executing stream pull");
 
+        taskType = TaskType.PULL;
         try {
             ExternalResource resource =
                     externalResource(anyType, keyColumn, columns, conflictResolutionAction, pullCorrelationRule);
             Provision provision = resource.getProvisions().get(0);
 
-            PullTask pullTask = entityFactory.newEntity(PullTask.class);
-            pullTask.setResource(resource);
-            pullTask.setMatchingRule(pullTaskTO.getMatchingRule());
-            pullTask.setUnmatchingRule(pullTaskTO.getUnmatchingRule());
-            pullTask.setPullMode(PullMode.FULL_RECONCILIATION);
-            pullTask.setPerformCreate(true);
-            pullTask.setPerformUpdate(true);
-            pullTask.setPerformDelete(false);
-            pullTask.setSyncStatus(false);
-            pullTask.setDestinationRealm(realmDAO.findByFullPath(pullTaskTO.getDestinationRealm()));
-            pullTask.setRemediation(pullTaskTO.isRemediation());
+            task = entityFactory.newEntity(PullTask.class);
+            task.setResource(resource);
+            task.setMatchingRule(pullTaskTO.getMatchingRule());
+            task.setUnmatchingRule(pullTaskTO.getUnmatchingRule());
+            task.setPullMode(PullMode.FULL_RECONCILIATION);
+            task.setPerformCreate(true);
+            task.setPerformUpdate(true);
+            task.setPerformDelete(false);
+            task.setSyncStatus(false);
+            task.setDestinationRealm(realmDAO.findByFullPath(pullTaskTO.getDestinationRealm()));
+            task.setRemediation(pullTaskTO.isRemediation());
 
-            profile = new ProvisioningProfile<>(connector, pullTask);
+            profile = new ProvisioningProfile<>(connector, task);
             profile.setDryRun(false);
             profile.setConflictResolutionAction(conflictResolutionAction);
             profile.getActions().addAll(getPullActions(pullTaskTO.getActions().stream().
@@ -207,7 +209,6 @@ public class StreamPullJobDelegate extends PullJobDelegate implements SyncopeStr
                     handler = buildAnyObjectHandler();
             }
             handler.setProfile(profile);
-            handler.setPullExecutor(this);
 
             // execute filtered pull
             Set<String> moreAttrsToGet = new HashSet<>();
@@ -238,6 +239,8 @@ public class StreamPullJobDelegate extends PullJobDelegate implements SyncopeStr
             throw e instanceof JobExecutionException
                     ? (JobExecutionException) e
                     : new JobExecutionException("While stream pulling", e);
+        } finally {
+            setStatus(null);
         }
     }
 }

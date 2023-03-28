@@ -20,11 +20,11 @@ package org.apache.syncope.common.lib.to;
 
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
+import jakarta.ws.rs.PathParam;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.ws.rs.PathParam;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 
@@ -49,6 +49,8 @@ public class RealmTO implements NamedEntityTO, TemplatableTO {
     private String accessPolicy;
 
     private String attrReleasePolicy;
+
+    private String ticketExpirationPolicy;
 
     private final List<String> actions = new ArrayList<>();
 
@@ -133,6 +135,14 @@ public class RealmTO implements NamedEntityTO, TemplatableTO {
         this.attrReleasePolicy = attrReleasePolicy;
     }
 
+    public String getTicketExpirationPolicy() {
+        return ticketExpirationPolicy;
+    }
+
+    public void setTicketExpirationPolicy(final String ticketExpirationPolicy) {
+        this.ticketExpirationPolicy = ticketExpirationPolicy;
+    }
+
     @JacksonXmlElementWrapper(localName = "actions")
     @JacksonXmlProperty(localName = "action")
     public List<String> getActions() {
@@ -172,6 +182,7 @@ public class RealmTO implements NamedEntityTO, TemplatableTO {
                 append(authPolicy, other.authPolicy).
                 append(accessPolicy, other.accessPolicy).
                 append(attrReleasePolicy, other.attrReleasePolicy).
+                append(ticketExpirationPolicy, other.ticketExpirationPolicy).
                 append(actions, other.actions).
                 append(templates, other.templates).
                 append(resources, other.resources).
@@ -190,6 +201,7 @@ public class RealmTO implements NamedEntityTO, TemplatableTO {
                 append(authPolicy).
                 append(accessPolicy).
                 append(attrReleasePolicy).
+                append(ticketExpirationPolicy).
                 append(actions).
                 append(templates).
                 append(resources).

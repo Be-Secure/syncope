@@ -32,7 +32,7 @@ import org.apache.syncope.sra.security.LogoutRouteMatcher;
 import org.apache.syncope.sra.security.PublicRouteMatcher;
 import org.apache.syncope.sra.security.cas.CASSecurityConfigUtils;
 import org.apache.syncope.sra.security.oauth2.OAuth2SecurityConfigUtils;
-import org.apache.syncope.sra.security.pac4j.NoOpLogoutHandler;
+import org.apache.syncope.sra.security.pac4j.NoOpSessionLogoutHandler;
 import org.apache.syncope.sra.security.saml2.SAML2MetadataEndpoint;
 import org.apache.syncope.sra.security.saml2.SAML2SecurityConfigUtils;
 import org.apache.syncope.sra.security.saml2.SAML2WebSsoAuthenticationWebFilter;
@@ -235,11 +235,12 @@ public class SecurityConfig {
             final SRAProperties props) {
         SAML2Configuration cfg = new SAML2Configuration(
                 resourceResolver.getResource(props.getSaml2().getKeystore()),
+                null,
+                props.getSaml2().getKeystoreType(),
                 props.getSaml2().getKeystoreStorePass(),
                 props.getSaml2().getKeystoreKeypass(),
                 resourceResolver.getResource(props.getSaml2().getIdpMetadata()));
 
-        cfg.setKeystoreType(props.getSaml2().getKeystoreType());
         if (cfg.getKeystoreResource() instanceof FileUrlResource) {
             cfg.setKeystoreGenerator(new BaseSAML2KeystoreGenerator(cfg) {
 
@@ -272,7 +273,7 @@ public class SecurityConfig {
         cfg.setServiceProviderMetadataResourceFilepath(props.getSaml2().getSpMetadataFilePath());
         cfg.setAcceptedSkew(props.getSaml2().getSkew());
 
-        cfg.setLogoutHandler(new NoOpLogoutHandler());
+        cfg.setSessionLogoutHandler(new NoOpSessionLogoutHandler());
 
         SAML2Client saml2Client = new SAML2Client(cfg);
         saml2Client.setName(SRAProperties.AMType.SAML2.name());
@@ -302,21 +303,19 @@ public class SecurityConfig {
                 anyExchange().authenticated();
 
         switch (props.getAmType()) {
-            case OIDC:
-            case OAUTH2:
+            case OIDC, OAUTH2 -> {
                 OAuth2SecurityConfigUtils.forLogin(http, props.getAmType(), ctx);
                 OAuth2SecurityConfigUtils.forLogout(builder, props.getAmType(), cacheManager, logoutRouteMatcher, ctx);
                 http.oauth2ResourceServer().jwt().jwtDecoder(ctx.getBean(ReactiveJwtDecoder.class));
-                break;
+            }
 
-            case SAML2:
+            case SAML2 ->
                 saml2Client.ifAvailable(client -> {
                     SAML2SecurityConfigUtils.forLogin(http, client, publicRouteMatcher);
                     SAML2SecurityConfigUtils.forLogout(builder, client, cacheManager, logoutRouteMatcher, ctx);
                 });
-                break;
 
-            case CAS:
+            case CAS -> {
                 CASSecurityConfigUtils.forLogin(
                         http,
                         props.getCas().getProtocol(),
@@ -328,9 +327,10 @@ public class SecurityConfig {
                         props.getCas().getServerPrefix(),
                         logoutRouteMatcher,
                         ctx);
-                break;
+            }
 
-            default:
+            default -> {
+            }
         }
 
         return builder.and().csrf().requireCsrfProtectionMatcher(csrfRouteMatcher).and().build();

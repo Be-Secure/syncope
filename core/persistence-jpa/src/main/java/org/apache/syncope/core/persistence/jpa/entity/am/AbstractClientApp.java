@@ -19,24 +19,28 @@
 package org.apache.syncope.core.persistence.jpa.entity.am;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import jakarta.persistence.Column;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Lob;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.MappedSuperclass;
 import java.util.ArrayList;
 import java.util.List;
-import javax.persistence.Column;
-import javax.persistence.FetchType;
-import javax.persistence.Lob;
-import javax.persistence.ManyToOne;
-import javax.persistence.MappedSuperclass;
+import java.util.Optional;
 import org.apache.syncope.common.lib.Attr;
+import org.apache.syncope.common.lib.clientapps.UsernameAttributeProviderConf;
 import org.apache.syncope.core.persistence.api.entity.Realm;
 import org.apache.syncope.core.persistence.api.entity.am.ClientApp;
 import org.apache.syncope.core.persistence.api.entity.policy.AccessPolicy;
 import org.apache.syncope.core.persistence.api.entity.policy.AttrReleasePolicy;
 import org.apache.syncope.core.persistence.api.entity.policy.AuthPolicy;
+import org.apache.syncope.core.persistence.api.entity.policy.TicketExpirationPolicy;
 import org.apache.syncope.core.persistence.jpa.entity.AbstractGeneratedKeyEntity;
 import org.apache.syncope.core.persistence.jpa.entity.JPARealm;
 import org.apache.syncope.core.persistence.jpa.entity.policy.JPAAccessPolicy;
 import org.apache.syncope.core.persistence.jpa.entity.policy.JPAAttrReleasePolicy;
 import org.apache.syncope.core.persistence.jpa.entity.policy.JPAAuthPolicy;
+import org.apache.syncope.core.persistence.jpa.entity.policy.JPATicketExpirationPolicy;
 import org.apache.syncope.core.provisioning.api.serialization.POJOHelper;
 
 @MappedSuperclass
@@ -53,11 +57,18 @@ public class AbstractClientApp extends AbstractGeneratedKeyEntity implements Cli
     @Column(unique = true, nullable = false)
     private Long clientAppId;
 
-    @Column
     private String description;
 
-    @Column
+    private String logo;
+
+    @Lob
+    private String usernameAttributeProviderConf;
+
     private String theme;
+
+    private String informationUrl;
+
+    private String privacyUrl;
 
     @ManyToOne(fetch = FetchType.EAGER)
     private JPARealm realm;
@@ -70,6 +81,9 @@ public class AbstractClientApp extends AbstractGeneratedKeyEntity implements Cli
 
     @ManyToOne(fetch = FetchType.EAGER)
     private JPAAttrReleasePolicy attrReleasePolicy;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    private JPATicketExpirationPolicy ticketExpirationPolicy;
 
     @Lob
     private String properties;
@@ -102,6 +116,57 @@ public class AbstractClientApp extends AbstractGeneratedKeyEntity implements Cli
     @Override
     public void setDescription(final String description) {
         this.description = description;
+    }
+
+    @Override
+    public String getLogo() {
+        return logo;
+    }
+
+    @Override
+    public void setLogo(final String logo) {
+        this.logo = logo;
+    }
+
+    @Override
+    public String getTheme() {
+        return theme;
+    }
+
+    @Override
+    public void setTheme(final String theme) {
+        this.theme = theme;
+    }
+
+    @Override
+    public String getInformationUrl() {
+        return informationUrl;
+    }
+
+    @Override
+    public void setInformationUrl(final String informationUrl) {
+        this.informationUrl = informationUrl;
+    }
+
+    @Override
+    public String getPrivacyUrl() {
+        return privacyUrl;
+    }
+
+    @Override
+    public void setPrivacyUrl(final String privacyUrl) {
+        this.privacyUrl = privacyUrl;
+    }
+
+    @Override
+    public UsernameAttributeProviderConf getUsernameAttributeProviderConf() {
+        return Optional.ofNullable(usernameAttributeProviderConf).
+                map(conf -> POJOHelper.deserialize(conf, UsernameAttributeProviderConf.class)).orElse(null);
+    }
+
+    @Override
+    public void setUsernameAttributeProviderConf(final UsernameAttributeProviderConf conf) {
+        this.usernameAttributeProviderConf = conf == null ? null : POJOHelper.serialize(conf);
     }
 
     @Override
@@ -138,6 +203,17 @@ public class AbstractClientApp extends AbstractGeneratedKeyEntity implements Cli
     }
 
     @Override
+    public TicketExpirationPolicy getTicketExpirationPolicy() {
+        return this.ticketExpirationPolicy;
+    }
+
+    @Override
+    public void setTicketExpirationPolicy(final TicketExpirationPolicy policy) {
+        checkType(policy, JPATicketExpirationPolicy.class);
+        this.ticketExpirationPolicy = (JPATicketExpirationPolicy) policy;
+    }
+
+    @Override
     public Realm getRealm() {
         return realm;
     }
@@ -146,16 +222,6 @@ public class AbstractClientApp extends AbstractGeneratedKeyEntity implements Cli
     public void setRealm(final Realm realm) {
         checkType(realm, JPARealm.class);
         this.realm = (JPARealm) realm;
-    }
-
-    @Override
-    public String getTheme() {
-        return theme;
-    }
-
-    @Override
-    public void setTheme(final String theme) {
-        this.theme = theme;
     }
 
     @Override

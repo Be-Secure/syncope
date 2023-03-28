@@ -35,7 +35,6 @@ import org.apache.syncope.client.console.pages.BasePage;
 import org.apache.syncope.client.console.panels.DirectoryPanel;
 import org.apache.syncope.client.console.panels.ExecMessageModal;
 import org.apache.syncope.client.console.reports.ReportWizardBuilder;
-import org.apache.syncope.client.console.reports.ReportletDirectoryPanel;
 import org.apache.syncope.client.console.rest.BaseRestClient;
 import org.apache.syncope.client.console.rest.NotificationRestClient;
 import org.apache.syncope.client.console.rest.ReportRestClient;
@@ -52,6 +51,7 @@ import org.apache.syncope.client.console.wicket.markup.html.form.ActionsPanel;
 import org.apache.syncope.client.console.wizards.WizardMgtPanel;
 import org.apache.syncope.client.ui.commons.Constants;
 import org.apache.syncope.client.ui.commons.DirectoryDataProvider;
+import org.apache.syncope.client.ui.commons.MIMETypesLoader;
 import org.apache.syncope.client.ui.commons.wizards.AjaxWizard;
 import org.apache.syncope.common.lib.SyncopeClientException;
 import org.apache.syncope.common.lib.to.ExecTO;
@@ -83,6 +83,7 @@ import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.model.ResourceModel;
 import org.apache.wicket.model.StringResourceModel;
+import org.apache.wicket.spring.injection.annot.SpringBean;
 
 public class JobWidget extends BaseWidget {
 
@@ -136,6 +137,9 @@ public class JobWidget extends BaseWidget {
     private AvailableJobsPanel availableJobsPanel;
 
     private final List<ExecTO> recent;
+
+    @SpringBean
+    private MIMETypesLoader mimeTypesLoader;
 
     private RecentExecPanel recentExecPanel;
 
@@ -384,7 +388,7 @@ public class JobWidget extends BaseWidget {
                         case REPORT:
                             ReportTO reportTO = ReportRestClient.read(jobTO.getRefKey());
 
-                            ReportWizardBuilder rwb = new ReportWizardBuilder(reportTO, pageRef);
+                            ReportWizardBuilder rwb = new ReportWizardBuilder(reportTO, mimeTypesLoader, pageRef);
                             rwb.setEventSink(AvailableJobsPanel.this);
 
                             target.add(jobModal.setContent(rwb.build(BaseModal.CONTENT_ID, AjaxWizard.Mode.EDIT)));
@@ -435,54 +439,6 @@ public class JobWidget extends BaseWidget {
 
             panel.add(new ActionLink<>() {
 
-                private static final long serialVersionUID = -7978723352517770644L;
-
-                @Override
-                public void onClick(final AjaxRequestTarget target, final JobTO ignore) {
-
-                    if (null != jobTO.getType()) {
-                        switch (jobTO.getType()) {
-
-                            case NOTIFICATION:
-                                break;
-
-                            case REPORT:
-
-                                final ReportTO reportTO = ReportRestClient.read(jobTO.getRefKey());
-
-                                target.add(AvailableJobsPanel.this.reportModal.setContent(
-                                        new ReportletDirectoryPanel(reportModal, jobTO.getRefKey(), pageRef)));
-
-                                MetaDataRoleAuthorizationStrategy.authorize(
-                                        reportModal.getForm(),
-                                        ENABLE, IdRepoEntitlement.REPORT_UPDATE);
-
-                                reportModal.header(new StringResourceModel(
-                                        "reportlet.conf", AvailableJobsPanel.this, new Model<>(reportTO)));
-
-                                reportModal.show(true);
-
-                                break;
-
-                            case TASK:
-                                break;
-
-                            default:
-                                break;
-                        }
-                    }
-                }
-
-                @Override
-                protected boolean statusCondition(final JobTO modelObject) {
-                    return !(null != jobTO.getType() && (JobType.TASK.equals(jobTO.getType())
-                            || JobType.NOTIFICATION.equals(jobTO.getType())));
-                }
-
-            }, ActionType.COMPOSE, IdRepoEntitlement.TASK_UPDATE);
-
-            panel.add(new ActionLink<>() {
-
                 private static final long serialVersionUID = -3722207913631435501L;
 
                 @Override
@@ -529,15 +485,11 @@ public class JobWidget extends BaseWidget {
         @Override
         @SuppressWarnings("unchecked")
         public void onEvent(final IEvent<?> event) {
-            if (event.getPayload() instanceof AjaxWizard.NewItemEvent) {
+            if (event.getPayload() instanceof AjaxWizard.NewItemCancelEvent
+                    || event.getPayload() instanceof AjaxWizard.NewItemFinishEvent) {
+
                 Optional<AjaxRequestTarget> target = ((AjaxWizard.NewItemEvent<?>) event.getPayload()).getTarget();
-
-                if (target.isPresent()
-                        && event.getPayload() instanceof AjaxWizard.NewItemCancelEvent
-                        || event.getPayload() instanceof AjaxWizard.NewItemFinishEvent) {
-
-                    jobModal.close(target.get());
-                }
+                target.ifPresent(jobModal::close);
             }
 
             super.onEvent(event);

@@ -28,12 +28,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
+import jakarta.ws.rs.core.Response;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
@@ -44,18 +46,20 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.naming.NamingException;
 import javax.naming.directory.Attribute;
 import javax.naming.directory.BasicAttribute;
-import javax.ws.rs.core.Response;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.syncope.client.lib.SyncopeClient;
+import org.apache.syncope.client.lib.batch.BatchRequest;
 import org.apache.syncope.common.lib.Attr;
 import org.apache.syncope.common.lib.SyncopeClientException;
 import org.apache.syncope.common.lib.SyncopeConstants;
@@ -98,6 +102,7 @@ import org.apache.syncope.common.lib.types.PullMode;
 import org.apache.syncope.common.lib.types.ResourceDeassociationAction;
 import org.apache.syncope.common.lib.types.ResourceOperation;
 import org.apache.syncope.common.lib.types.TaskType;
+import org.apache.syncope.common.lib.types.ThreadPoolSettings;
 import org.apache.syncope.common.lib.types.UnmatchingRule;
 import org.apache.syncope.common.rest.api.RESTHeaders;
 import org.apache.syncope.common.rest.api.beans.AnyQuery;
@@ -106,11 +111,10 @@ import org.apache.syncope.common.rest.api.beans.RemediationQuery;
 import org.apache.syncope.common.rest.api.beans.TaskQuery;
 import org.apache.syncope.common.rest.api.service.ConnectorService;
 import org.apache.syncope.common.rest.api.service.TaskService;
+import org.apache.syncope.common.rest.api.service.UserService;
 import org.apache.syncope.core.provisioning.java.pushpull.DBPasswordPullActions;
 import org.apache.syncope.core.provisioning.java.pushpull.LDAPPasswordPullActions;
 import org.apache.syncope.core.spring.security.Encryptor;
-import org.apache.syncope.fit.ElasticsearchDetector;
-import org.apache.syncope.fit.FlowableDetector;
 import org.apache.syncope.fit.core.reference.TestPullActions;
 import org.identityconnectors.framework.common.objects.Name;
 import org.junit.jupiter.api.BeforeAll;
@@ -143,6 +147,39 @@ public class PullTaskITCase extends AbstractTaskITCase {
         PullTaskTO pullTask = TASK_SERVICE.read(TaskType.PULL, PULL_TASK_KEY, true);
         pullTask.getActions().add(pullActions.getKey());
         TASK_SERVICE.update(TaskType.PULL, pullTask);
+    }
+
+    private static Pair<String, Set<Attribute>> prepareLdapAttributes(
+            final String uid,
+            final String email,
+            final String description,
+            final String givenName,
+            final String sn,
+            final String registeredAddress,
+            final String title,
+            final String password) {
+
+        String entryDn = "uid=" + uid + ",ou=People,o=isp";
+        Set<Attribute> attributes = new HashSet<>();
+
+        attributes.add(new BasicAttribute("description", description));
+        attributes.add(new BasicAttribute("givenName", givenName));
+        attributes.add(new BasicAttribute("mail", email));
+        attributes.add(new BasicAttribute("sn", sn));
+        attributes.add(new BasicAttribute("cn", uid));
+        attributes.add(new BasicAttribute("uid", uid));
+        attributes.add(new BasicAttribute("registeredaddress", registeredAddress));
+        attributes.add(new BasicAttribute("title", title));
+        attributes.add(new BasicAttribute("userpassword", password));
+
+        Attribute oc = new BasicAttribute("objectClass");
+        oc.add("top");
+        oc.add("person");
+        oc.add("inetOrgPerson");
+        oc.add("organizationalPerson");
+        attributes.add(oc);
+
+        return Pair.of(entryDn, attributes);
     }
 
     @Test
@@ -194,7 +231,7 @@ public class PullTaskITCase extends AbstractTaskITCase {
 
     @Test
     public void fromCSV() throws Exception {
-        assumeFalse(ElasticsearchDetector.isElasticSearchEnabled(ADMIN_CLIENT.platform()));
+        assumeFalse(IS_ELASTICSEARCH_ENABLED);
 
         removeTestUsers();
 
@@ -267,7 +304,7 @@ public class PullTaskITCase extends AbstractTaskITCase {
             UserTO userTO = USER_SERVICE.read(inUserTO.getKey());
             assertNotNull(userTO);
             assertEquals(userName, userTO.getUsername());
-            assertEquals(FlowableDetector.isFlowableEnabledForUserWorkflow(ADMIN_CLIENT.platform())
+            assertEquals(IS_FLOWABLE_ENABLED
                     ? "active" : "created", userTO.getStatus());
             assertEquals("test9@syncope.apache.org", userTO.getPlainAttr("email").get().getValues().get(0));
             assertEquals("test9@syncope.apache.org", userTO.getPlainAttr("userId").get().getValues().get(0));
@@ -569,7 +606,7 @@ public class PullTaskITCase extends AbstractTaskITCase {
             // 4. pull
             execProvisioningTask(TASK_SERVICE, TaskType.PULL, pullTask.getKey(), MAX_WAIT_SECONDS, false);
 
-            if (ElasticsearchDetector.isElasticSearchEnabled(ADMIN_CLIENT.platform())) {
+            if (IS_ELASTICSEARCH_ENABLED) {
                 try {
                     Thread.sleep(2000);
                 } catch (InterruptedException ex) {
@@ -620,6 +657,7 @@ public class PullTaskITCase extends AbstractTaskITCase {
             assertNotNull(reconFilterBuilder);
 
             task = TASK_SERVICE.read(TaskType.PULL, "7c2242f4-14af-4ab5-af31-cdae23783655", true);
+            task.setName(getUUIDString());
             task.setPullMode(PullMode.FILTERED_RECONCILIATION);
             task.setReconFilterBuilder(reconFilterBuilder.getKey());
             response = TASK_SERVICE.create(TaskType.PULL, task);
@@ -760,6 +798,7 @@ public class PullTaskITCase extends AbstractTaskITCase {
         PullTaskTO pullTask = (PullTaskTO) TASK_SERVICE.search(new TaskQuery.Builder(TaskType.PULL).
                 resource(RESOURCE_NAME_LDAP).build()).getResult().get(0);
         assertNotNull(pullTask);
+        pullTask.setName(getUUIDString());
         pullTask.setResource(ldap.getKey());
         pullTask.setRemediation(true);
         pullTask.getActions().clear();
@@ -854,14 +893,15 @@ public class PullTaskITCase extends AbstractTaskITCase {
             pullTask.setMatchingRule(MatchingRule.UPDATE);
 
             try {
-                RECONCILIATION_SERVICE.pull(new ReconQuery.Builder(AnyTypeKind.USER.name(), ldap.getKey()).fiql(
-                        "uid==pullFromLDAP").build(), pullTask);
+                RECONCILIATION_SERVICE.pull(new ReconQuery.Builder(AnyTypeKind.USER.name(), ldap.getKey()).
+                        fiql("uid==pullFromLDAP").build(), pullTask);
                 fail("Should not arrive here");
             } catch (SyncopeClientException sce) {
                 assertEquals(ClientExceptionType.Reconciliation, sce.getType());
             }
             Optional<RemediationTO> remediation = REMEDIATION_SERVICE.list(
-                    new RemediationQuery.Builder().page(1).size(1000).build()).getResult().stream().
+                    new RemediationQuery.Builder().after(OffsetDateTime.now().minusSeconds(30)).
+                            page(1).size(1000).build()).getResult().stream().
                     filter(r -> "uid=pullFromLDAP,ou=People,o=isp".equalsIgnoreCase(r.getRemoteName())).
                     findFirst();
             assertTrue(remediation.isPresent());
@@ -875,6 +915,77 @@ public class PullTaskITCase extends AbstractTaskITCase {
         } finally {
             RESOURCE_SERVICE.delete(ldap.getKey());
             cleanUpRemediations();
+        }
+    }
+
+    @Test
+    public void concurrentPull() throws NamingException, InterruptedException {
+        int usersBefore = USER_SERVICE.search(new AnyQuery.Builder().fiql(
+                SyncopeClient.getUserSearchConditionBuilder().is("username").equalTo("pullFromLDAP_*").query()).
+                page(1).size(0).build()).getTotalCount();
+
+        // 0. first cleanup then create 100 users on LDAP
+        ldapCleanup();
+
+        ExecutorService tp = Executors.newFixedThreadPool(10);
+        for (int i = 0; i < 100; i++) {
+            String idx = StringUtils.leftPad(String.valueOf(i), 2, "0");
+            tp.submit(() -> {
+                try {
+                    createLdapRemoteObject(RESOURCE_LDAP_ADMIN_DN, RESOURCE_LDAP_ADMIN_PWD, prepareLdapAttributes(
+                            "pullFromLDAP_" + idx,
+                            "pullFromLDAP_" + idx + "@syncope.apache.org",
+                            "Active",
+                            "pullFromLDAP_" + idx,
+                            "Surname",
+                            "5BAA61E4C9B93F3F0682250B6CF8331B7EE68FD8",
+                            "odd",
+                            "password"));
+                } catch (NamingException e) {
+                    LOG.error("While creating LDAP {}-th user", idx, e);
+                }
+            });
+        }
+        tp.shutdown();
+        tp.awaitTermination(MAX_WAIT_SECONDS, TimeUnit.SECONDS);
+
+        // 1. create new concurrent pull task
+        PullTaskTO pullTask = TASK_SERVICE.read(TaskType.PULL, "1e419ca4-ea81-4493-a14f-28b90113686d", false);
+        assertNull(pullTask.getConcurrentSettings());
+        pullTask.setKey(null);
+        pullTask.setName("LDAP Concurrent Pull Task");
+        pullTask.setDescription("LDAP Concurrent Pull Task");
+
+        ThreadPoolSettings tps = new ThreadPoolSettings();
+        tps.setCorePoolSize(3);
+        tps.setMaxPoolSize(3);
+        tps.setQueueCapacity(100);
+        pullTask.setConcurrentSettings(tps);
+
+        Response response = TASK_SERVICE.create(TaskType.PULL, pullTask);
+        String pullTaskKey = response.getHeaderString(RESTHeaders.RESOURCE_KEY);
+
+        PagedResult<UserTO> result = null;
+        try {
+            // 2. run concurrent pull task
+            ExecTO execution = execProvisioningTask(
+                    TASK_SERVICE, TaskType.PULL, pullTaskKey, 5 * MAX_WAIT_SECONDS, false);
+
+            // 3. verify execution status
+            assertEquals(ExecStatus.SUCCESS, ExecStatus.valueOf(execution.getStatus()));
+
+            // 4. verify that the given number of users was effectively pulled
+            result = USER_SERVICE.search(new AnyQuery.Builder().fiql(
+                    SyncopeClient.getUserSearchConditionBuilder().is("username").equalTo("pullFromLDAP_*").query()).
+                    page(1).size(200).build());
+            assertTrue(result.getTotalCount() > usersBefore);
+        } finally {
+            if (result != null) {
+                BatchRequest batchRequest = ADMIN_CLIENT.batch();
+                UserService batchUserService = batchRequest.getService(UserService.class);
+                result.getResult().stream().map(UserTO::getKey).forEach(batchUserService::delete);
+                batchRequest.commit();
+            }
         }
     }
 
@@ -1012,7 +1123,7 @@ public class PullTaskITCase extends AbstractTaskITCase {
 
         PullTaskTO task = new PullTaskTO();
         task.setDestinationRealm(SyncopeConstants.ROOT_REALM);
-        task.setName("Test Pull Rule");
+        task.setName(getUUIDString());
         task.setActive(true);
         task.setResource(RESOURCE_NAME_WS2);
         task.setPullMode(PullMode.FULL_RECONCILIATION);
@@ -1082,7 +1193,7 @@ public class PullTaskITCase extends AbstractTaskITCase {
 
     @Test
     public void issueSYNCOPE307() {
-        assumeFalse(ElasticsearchDetector.isElasticSearchEnabled(ADMIN_CLIENT.platform()));
+        assumeFalse(IS_ELASTICSEARCH_ENABLED);
 
         UserCR userCR = UserITCase.getUniqueSample("s307@apache.org");
         userCR.setUsername("test0");
@@ -1255,7 +1366,7 @@ public class PullTaskITCase extends AbstractTaskITCase {
 
             pullTask = new PullTaskTO();
             pullTask.setDestinationRealm(SyncopeConstants.ROOT_REALM);
-            pullTask.setName("LDAP Pull Task");
+            pullTask.setName(getUUIDString());
             pullTask.setActive(true);
             pullTask.setPerformCreate(true);
             pullTask.setPerformUpdate(true);
@@ -1278,7 +1389,7 @@ public class PullTaskITCase extends AbstractTaskITCase {
             fail(e::getMessage);
         } finally {
             // Delete PullTask + user + reset the connector
-            if (pullTask != null) {
+            if (pullTask != null && pullTask.getKey() != null) {
                 TASK_SERVICE.delete(TaskType.PULL, pullTask.getKey());
             }
 
@@ -1468,40 +1579,8 @@ public class PullTaskITCase extends AbstractTaskITCase {
         }
     }
 
-    private void cleanUpRemediations() {
+    private static void cleanUpRemediations() {
         REMEDIATION_SERVICE.list(new RemediationQuery.Builder().page(1).size(100).build()).getResult().forEach(
                 r -> REMEDIATION_SERVICE.delete(r.getKey()));
-    }
-
-    private Pair<String, Set<Attribute>> prepareLdapAttributes(
-            final String uid,
-            final String email,
-            final String description,
-            final String givenName,
-            final String sn,
-            final String registeredAddress,
-            final String title,
-            final String password) {
-        String entryDn = "uid=" + uid + ",ou=People,o=isp";
-        Set<Attribute> attributes = new HashSet<>();
-
-        attributes.add(new BasicAttribute("description", description));
-        attributes.add(new BasicAttribute("givenName", givenName));
-        attributes.add(new BasicAttribute("mail", email));
-        attributes.add(new BasicAttribute("sn", sn));
-        attributes.add(new BasicAttribute("cn", uid));
-        attributes.add(new BasicAttribute("uid", uid));
-        attributes.add(new BasicAttribute("registeredaddress", registeredAddress));
-        attributes.add(new BasicAttribute("title", title));
-        attributes.add(new BasicAttribute("userpassword", password));
-
-        Attribute oc = new BasicAttribute("objectClass");
-        oc.add("top");
-        oc.add("person");
-        oc.add("inetOrgPerson");
-        oc.add("organizationalPerson");
-        attributes.add(oc);
-
-        return Pair.of(entryDn, attributes);
     }
 }

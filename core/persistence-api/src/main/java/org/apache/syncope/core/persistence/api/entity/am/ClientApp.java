@@ -20,11 +20,13 @@ package org.apache.syncope.core.persistence.api.entity.am;
 
 import java.util.List;
 import org.apache.syncope.common.lib.Attr;
+import org.apache.syncope.common.lib.clientapps.UsernameAttributeProviderConf;
 import org.apache.syncope.core.persistence.api.entity.Entity;
 import org.apache.syncope.core.persistence.api.entity.Realm;
 import org.apache.syncope.core.persistence.api.entity.policy.AccessPolicy;
 import org.apache.syncope.core.persistence.api.entity.policy.AttrReleasePolicy;
 import org.apache.syncope.core.persistence.api.entity.policy.AuthPolicy;
+import org.apache.syncope.core.persistence.api.entity.policy.TicketExpirationPolicy;
 
 public interface ClientApp extends Entity {
 
@@ -40,6 +42,26 @@ public interface ClientApp extends Entity {
 
     void setDescription(String description);
 
+    String getLogo();
+
+    void setLogo(String logo);
+
+    void setTheme(String name);
+
+    String getTheme();
+
+    String getInformationUrl();
+
+    void setInformationUrl(String informationUrl);
+
+    String getPrivacyUrl();
+
+    void setPrivacyUrl(String privacyUrl);
+
+    UsernameAttributeProviderConf getUsernameAttributeProviderConf();
+
+    void setUsernameAttributeProviderConf(UsernameAttributeProviderConf conf);
+
     AuthPolicy getAuthPolicy();
 
     void setAuthPolicy(AuthPolicy policy);
@@ -52,13 +74,13 @@ public interface ClientApp extends Entity {
 
     void setAttrReleasePolicy(AttrReleasePolicy policy);
 
+    TicketExpirationPolicy getTicketExpirationPolicy();
+
+    void setTicketExpirationPolicy(TicketExpirationPolicy policy);
+
     Realm getRealm();
 
     void setRealm(Realm realm);
-
-    void setTheme(String name);
-
-    String getTheme();
 
     List<Attr> getProperties();
 

@@ -26,10 +26,10 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import jakarta.ws.rs.core.GenericType;
+import jakarta.ws.rs.core.MediaType;
 import java.io.IOException;
 import java.util.List;
-import javax.ws.rs.core.GenericType;
-import javax.ws.rs.core.MediaType;
 import org.apache.cxf.helpers.IOUtils;
 import org.apache.cxf.jaxrs.client.WebClient;
 import org.apache.syncope.client.lib.SyncopeClient;
@@ -46,7 +46,6 @@ import org.apache.syncope.common.lib.types.ClientExceptionType;
 import org.apache.syncope.common.rest.api.beans.UserRequestQuery;
 import org.apache.syncope.common.rest.api.service.UserRequestService;
 import org.apache.syncope.fit.AbstractITCase;
-import org.apache.syncope.fit.FlowableDetector;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,7 +55,7 @@ public class UserRequestITCase extends AbstractITCase {
     @BeforeAll
     public static void loadBpmnProcesses() throws IOException {
         assumeFalse(CLIENT_FACTORY.getContentType() == SyncopeClientFactoryBean.ContentType.YAML);
-        assumeTrue(FlowableDetector.isFlowableEnabledForUserWorkflow(ADMIN_CLIENT.platform()));
+        assumeTrue(IS_FLOWABLE_ENABLED);
 
         WebClient.client(BPMN_PROCESS_SERVICE).type(MediaType.APPLICATION_XML_TYPE);
         BPMN_PROCESS_SERVICE.set("directorGroupRequest",
@@ -70,7 +69,7 @@ public class UserRequestITCase extends AbstractITCase {
     @BeforeEach
     public void check() {
         assumeFalse(CLIENT_FACTORY.getContentType() == SyncopeClientFactoryBean.ContentType.YAML);
-        assumeTrue(FlowableDetector.isFlowableEnabledForUserWorkflow(ADMIN_CLIENT.platform()));
+        assumeTrue(IS_FLOWABLE_ENABLED);
     }
 
     @Test

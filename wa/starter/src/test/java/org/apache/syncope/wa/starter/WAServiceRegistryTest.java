@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.syncope.client.lib.SyncopeClient;
-import org.apache.syncope.common.lib.Attr;
 import org.apache.syncope.common.lib.auth.OIDCAuthModuleConf;
 import org.apache.syncope.common.lib.policy.AccessPolicyTO;
 import org.apache.syncope.common.lib.policy.AttrReleasePolicyTO;
@@ -35,6 +34,8 @@ import org.apache.syncope.common.lib.policy.AuthPolicyTO;
 import org.apache.syncope.common.lib.policy.DefaultAccessPolicyConf;
 import org.apache.syncope.common.lib.policy.DefaultAttrReleasePolicyConf;
 import org.apache.syncope.common.lib.policy.DefaultAuthPolicyConf;
+import org.apache.syncope.common.lib.policy.DefaultTicketExpirationPolicyConf;
+import org.apache.syncope.common.lib.policy.TicketExpirationPolicyTO;
 import org.apache.syncope.common.lib.to.AuthModuleTO;
 import org.apache.syncope.common.lib.to.OIDCRPClientAppTO;
 import org.apache.syncope.common.lib.to.SAML2SPClientAppTO;
@@ -54,7 +55,6 @@ import org.apereo.cas.services.OidcRegisteredService;
 import org.apereo.cas.services.RegisteredService;
 import org.apereo.cas.services.RegisteredServiceAccessStrategy;
 import org.apereo.cas.services.RegisteredServiceDelegatedAuthenticationPolicy;
-import org.apereo.cas.services.ReturnAllowedAttributeReleasePolicy;
 import org.apereo.cas.services.ServicesManager;
 import org.apereo.cas.support.saml.services.SamlRegisteredService;
 import org.apereo.cas.util.RandomUtils;
@@ -96,7 +96,6 @@ public class WAServiceRegistryTest extends AbstractTest {
 
     private static void addPolicies(
             final WAClientApp waClientApp,
-            final boolean withReleaseAttributes,
             final boolean withAttrReleasePolicy) {
 
         DefaultAuthPolicyConf authPolicyConf = new DefaultAuthPolicyConf();
@@ -107,14 +106,14 @@ public class WAServiceRegistryTest extends AbstractTest {
 
         waClientApp.setAuthPolicy(authPolicy);
 
-        if (withReleaseAttributes) {
-            waClientApp.getReleaseAttrs().putAll(Map.of("uid", "username", "cn", "fullname"));
-        }
+        AuthModuleTO authModule = new AuthModuleTO();
+        authModule.setKey("TestAuthModule");
+        waClientApp.getAuthModules().add(authModule);
 
         AccessPolicyTO accessPolicy = new AccessPolicyTO();
-        accessPolicy.setEnabled(true);
         DefaultAccessPolicyConf accessPolicyConf = new DefaultAccessPolicyConf();
-        accessPolicyConf.getRequiredAttrs().add(new Attr.Builder("cn").values("admin", "Admin", "TheAdmin").build());
+        accessPolicyConf.setEnabled(true);
+        accessPolicyConf.getRequiredAttrs().put("cn", "admin,Admin,TheAdmin");
         accessPolicy.setConf(accessPolicyConf);
         waClientApp.setAccessPolicy(accessPolicy);
 
@@ -122,11 +121,20 @@ public class WAServiceRegistryTest extends AbstractTest {
             DefaultAttrReleasePolicyConf attrReleasePolicyConf = new DefaultAttrReleasePolicyConf();
             attrReleasePolicyConf.getAllowedAttrs().add("cn");
             attrReleasePolicyConf.getPrincipalAttrRepoConf().getAttrRepos().add("TestAttrRepo");
+            attrReleasePolicyConf.getReleaseAttrs().putAll(Map.of("uid", "username", "cn", "fullname"));
 
             AttrReleasePolicyTO attrReleasePolicy = new AttrReleasePolicyTO();
             attrReleasePolicy.setConf(attrReleasePolicyConf);
             waClientApp.setAttrReleasePolicy(attrReleasePolicy);
         }
+
+        TicketExpirationPolicyTO ticketExpirationPolicy = new TicketExpirationPolicyTO();
+        DefaultTicketExpirationPolicyConf ticketExpirationPolicyConf = new DefaultTicketExpirationPolicyConf();
+        DefaultTicketExpirationPolicyConf.TGTConf tgtConf = new DefaultTicketExpirationPolicyConf.TGTConf();
+        tgtConf.setMaxTimeToLiveInSeconds(110);
+        ticketExpirationPolicyConf.setTgtConf(tgtConf);
+        ticketExpirationPolicy.setConf(ticketExpirationPolicyConf);
+        waClientApp.setTicketExpirationPolicy(ticketExpirationPolicy);
     }
 
     @Autowired
@@ -156,7 +164,7 @@ public class WAServiceRegistryTest extends AbstractTest {
         WAClientApp waClientApp = new WAClientApp();
         waClientApp.setClientAppTO(buildOIDCRP());
         Long clientAppId = waClientApp.getClientAppTO().getClientAppId();
-        addPolicies(waClientApp, false, false);
+        addPolicies(waClientApp, false);
 
         SyncopeCoreTestingServer.CLIENT_APPS.add(waClientApp);
         List<WAClientApp> apps = service.list();
@@ -186,7 +194,7 @@ public class WAServiceRegistryTest extends AbstractTest {
         waClientApp = new WAClientApp();
         waClientApp.setClientAppTO(buildSAML2SP());
         clientAppId = waClientApp.getClientAppTO().getClientAppId();
-        addPolicies(waClientApp, false, true);
+        addPolicies(waClientApp, true);
 
         SyncopeCoreTestingServer.CLIENT_APPS.add(waClientApp);
         apps = service.list();
@@ -203,12 +211,12 @@ public class WAServiceRegistryTest extends AbstractTest {
         assertEquals(samlspto.getEntityId(), saml.getServiceId());
         assertTrue(saml.getAuthenticationPolicy().getRequiredAuthenticationHandlers().contains("TestAuthModule"));
         assertNotNull(found.getAccessStrategy());
-        assertTrue(saml.getAttributeReleasePolicy() instanceof ReturnAllowedAttributeReleasePolicy);
+        assertTrue(saml.getAttributeReleasePolicy() instanceof ChainingAttributeReleasePolicy);
 
         waClientApp = new WAClientApp();
         waClientApp.setClientAppTO(buildSAML2SP());
         clientAppId = waClientApp.getClientAppTO().getClientAppId();
-        addPolicies(waClientApp, false, false);
+        addPolicies(waClientApp, false);
 
         SyncopeCoreTestingServer.CLIENT_APPS.add(waClientApp);
         apps = service.list();
@@ -247,7 +255,7 @@ public class WAServiceRegistryTest extends AbstractTest {
         waClientApp.setClientAppTO(buildOIDCRP());
         waClientApp.getAuthModules().add(0, authModuleTO);
         Long clientAppId = waClientApp.getClientAppTO().getClientAppId();
-        addPolicies(waClientApp, false, false);
+        addPolicies(waClientApp, false);
         DefaultAuthPolicyConf authPolicyConf = (DefaultAuthPolicyConf) waClientApp.getAuthPolicy().getConf();
         authPolicyConf.getAuthModules().clear();
         authPolicyConf.getAuthModules().add(authModuleTO.getKey());
@@ -266,7 +274,7 @@ public class WAServiceRegistryTest extends AbstractTest {
         assertNotNull(service);
 
         assertEquals(
-                Set.of("DelegatedClientAuthenticationHandler"),
+                Set.of("TestAuthModule", "DelegatedClientAuthenticationHandler"),
                 service.getAuthenticationPolicy().getRequiredAuthenticationHandlers());
 
         RegisteredServiceAccessStrategy accessStrategy = service.getAccessStrategy();
@@ -276,5 +284,7 @@ public class WAServiceRegistryTest extends AbstractTest {
         assertNotNull(delegatedAuthPolicy);
         assertEquals(1, delegatedAuthPolicy.getAllowedProviders().size());
         assertTrue(delegatedAuthPolicy.getAllowedProviders().contains(authModuleTO.getKey()));
+
+        assertNotNull(service.getTicketGrantingTicketExpirationPolicy());
     }
 }

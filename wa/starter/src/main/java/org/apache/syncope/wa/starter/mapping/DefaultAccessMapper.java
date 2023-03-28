@@ -18,7 +18,9 @@
  */
 package org.apache.syncope.wa.starter.mapping;
 
-import java.util.HashSet;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.syncope.common.lib.policy.AccessPolicyTO;
 import org.apache.syncope.common.lib.policy.DefaultAccessPolicyConf;
 import org.apereo.cas.services.DefaultRegisteredServiceAccessStrategy;
@@ -29,22 +31,26 @@ public class DefaultAccessMapper implements AccessMapper {
 
     @Override
     public RegisteredServiceAccessStrategy build(final AccessPolicyTO policy) {
+        DefaultAccessPolicyConf conf = (DefaultAccessPolicyConf) policy.getConf();
+
         DefaultRegisteredServiceAccessStrategy accessStrategy =
-                new DefaultRegisteredServiceAccessStrategy(policy.isEnabled(), policy.isSsoEnabled());
+                new DefaultRegisteredServiceAccessStrategy(conf.isEnabled(), conf.isSsoEnabled());
 
-        accessStrategy.setOrder(policy.getOrder());
+        accessStrategy.setOrder(conf.getOrder());
 
-        accessStrategy.setRequireAllAttributes(policy.isRequireAllAttributes());
+        accessStrategy.setRequireAllAttributes(conf.isRequireAllAttributes());
 
-        accessStrategy.setCaseInsensitive(policy.isCaseInsensitive());
+        accessStrategy.setCaseInsensitive(conf.isCaseInsensitive());
 
-        accessStrategy.setUnauthorizedRedirectUrl(policy.getUnauthorizedRedirectUrl());
+        accessStrategy.setUnauthorizedRedirectUrl(conf.getUnauthorizedRedirectUrl());
 
-        policy.getConf().getRequiredAttrs().forEach(
-                attr -> accessStrategy.getRequiredAttributes().put(attr.getSchema(), new HashSet<>(attr.getValues())));
+        conf.getRequiredAttrs().forEach(
+                (k, v) -> accessStrategy.getRequiredAttributes().put(k,
+                        Stream.of(StringUtils.split(v, ",")).map(String::trim).collect(Collectors.toSet())));
 
-        policy.getConf().getRejectedAttrs().forEach(
-                attr -> accessStrategy.getRejectedAttributes().put(attr.getSchema(), new HashSet<>(attr.getValues())));
+        conf.getRejectedAttrs().forEach(
+                (k, v) -> accessStrategy.getRejectedAttributes().put(k,
+                        Stream.of(StringUtils.split(v, ",")).map(String::trim).collect(Collectors.toSet())));
 
         return accessStrategy;
     }

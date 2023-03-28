@@ -29,13 +29,14 @@ public class AttrReleasePolicyTO extends PolicyTO {
 
     private int order;
 
-    private Boolean status;
+    private boolean status = true;
 
     private AttrReleasePolicyConf conf;
 
     @JacksonXmlProperty(localName = "_class", isAttribute = true)
     @JsonProperty("_class")
-    @Schema(name = "_class", required = true, example = "org.apache.syncope.common.lib.policy.AttrReleasePolicyTO")
+    @Schema(name = "_class", requiredMode = Schema.RequiredMode.REQUIRED,
+            example = "org.apache.syncope.common.lib.policy.AttrReleasePolicyTO")
     @Override
     public String getDiscriminator() {
         return getClass().getName();
@@ -49,7 +50,7 @@ public class AttrReleasePolicyTO extends PolicyTO {
         this.order = order;
     }
 
-    public Boolean getStatus() {
+    public boolean getStatus() {
         return status;
     }
 

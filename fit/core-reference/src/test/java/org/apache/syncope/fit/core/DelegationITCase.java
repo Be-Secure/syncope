@@ -24,13 +24,13 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import java.security.AccessControlException;
+import jakarta.ws.rs.ForbiddenException;
+import jakarta.ws.rs.NotAuthorizedException;
+import jakarta.ws.rs.core.Response;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.ws.rs.ForbiddenException;
-import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.syncope.client.lib.SyncopeClient;
 import org.apache.syncope.common.lib.SyncopeClientException;
@@ -49,7 +49,6 @@ import org.apache.syncope.common.rest.api.service.DelegationService;
 import org.apache.syncope.common.rest.api.service.UserService;
 import org.apache.syncope.core.logic.UserLogic;
 import org.apache.syncope.fit.AbstractITCase;
-import org.apache.syncope.fit.ElasticsearchDetector;
 import org.junit.jupiter.api.Test;
 
 public class DelegationITCase extends AbstractITCase {
@@ -241,7 +240,7 @@ public class DelegationITCase extends AbstractITCase {
         // 3b. search users as rossini with delegation -> SUCCESS
         int forRossini = rossini.delegatedBy("bellini").getService(UserService.class).search(
                 new AnyQuery.Builder().realm(SyncopeConstants.ROOT_REALM).build()).getTotalCount();
-        if (!ElasticsearchDetector.isElasticSearchEnabled(ADMIN_CLIENT.platform())) {
+        if (!IS_ELASTICSEARCH_ENABLED) {
             assertEquals(forBellini, forRossini);
         }
 
@@ -252,7 +251,7 @@ public class DelegationITCase extends AbstractITCase {
             rossini.getService(UserService.class).search(
                     new AnyQuery.Builder().realm(SyncopeConstants.ROOT_REALM).build());
             fail();
-        } catch (AccessControlException e) {
+        } catch (NotAuthorizedException e) {
             assertNotNull(e);
         }
 

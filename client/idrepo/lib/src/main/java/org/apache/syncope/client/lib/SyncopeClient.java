@@ -21,6 +21,10 @@ package org.apache.syncope.client.lib;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import jakarta.ws.rs.core.EntityTag;
+import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Base64;
@@ -29,10 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import javax.ws.rs.core.EntityTag;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.cxf.configuration.jsse.TLSClientParameters;
@@ -150,7 +151,7 @@ public class SyncopeClient {
 
     protected JsonNode info() throws IOException {
         WebClient webClient = WebClient.create(
-                restClientFactory.getAddress().replace("/rest", "/actuator/info")).
+                StringUtils.removeEnd(restClientFactory.getAddress().replace("/rest", "/actuator/info"), "/")).
                 accept(MediaType.APPLICATION_JSON_TYPE).
                 header(RESTHeaders.DOMAIN, getDomain());
 
@@ -164,9 +165,10 @@ public class SyncopeClient {
 
     public Pair<String, String> gitAndBuildInfo() {
         try {
+            JsonNode info = info();
             return Pair.of(
-                    info().get("git").get("commit").get("id").asText(),
-                    info().get("build").get("version").asText());
+                    info.has("git") ? info.get("git").get("commit").get("id").asText() : StringUtils.EMPTY,
+                    info.get("build").get("version").asText());
         } catch (IOException e) {
             throw new RuntimeException("While getting build and git Info", e);
         }
@@ -374,13 +376,12 @@ public class SyncopeClient {
         }
 
         try {
-            return Triple.of(MAPPER.readValue(
-                    response.getHeaderString(RESTHeaders.OWNED_ENTITLEMENTS),
-                    new TypeReference<>() {
-            }),
+            return Triple.of(
                     MAPPER.readValue(
-                            response.getHeaderString(RESTHeaders.DELEGATIONS),
-                            new TypeReference<>() {
+                            response.getHeaderString(RESTHeaders.OWNED_ENTITLEMENTS), new TypeReference<>() {
+                    }),
+                    MAPPER.readValue(
+                            response.getHeaderString(RESTHeaders.DELEGATIONS), new TypeReference<>() {
                     }),
                     response.readEntity(UserTO.class));
         } catch (IOException e) {

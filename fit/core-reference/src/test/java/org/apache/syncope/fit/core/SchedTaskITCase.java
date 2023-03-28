@@ -26,13 +26,13 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import jakarta.ws.rs.core.Response;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
-import javax.ws.rs.core.Response;
 import org.apache.syncope.common.lib.to.ExecTO;
 import org.apache.syncope.common.lib.to.ImplementationTO;
 import org.apache.syncope.common.lib.to.JobTO;
@@ -44,7 +44,7 @@ import org.apache.syncope.common.lib.to.TaskTO;
 import org.apache.syncope.common.lib.types.IdRepoImplementationType;
 import org.apache.syncope.common.lib.types.JobAction;
 import org.apache.syncope.common.lib.types.TaskType;
-import org.apache.syncope.common.rest.api.beans.ExecListQuery;
+import org.apache.syncope.common.rest.api.beans.ExecQuery;
 import org.apache.syncope.common.rest.api.beans.ExecSpecs;
 import org.apache.syncope.common.rest.api.beans.TaskQuery;
 import org.apache.syncope.common.rest.api.service.TaskService;
@@ -123,7 +123,7 @@ public class SchedTaskITCase extends AbstractTaskITCase {
         });
 
         PagedResult<ExecTO> execs =
-                TASK_SERVICE.listExecutions(new ExecListQuery.Builder().key(task.getKey()).build());
+                TASK_SERVICE.listExecutions(new ExecQuery.Builder().key(task.getKey()).build());
         assertEquals(1, execs.getTotalCount());
         assertTrue(execs.getResult().get(0).getStart().isAfter(initial));
         // round 1 sec for safety

@@ -24,7 +24,7 @@ under the License.
   <parent>
     <groupId>org.apache.syncope</groupId>
     <artifactId>syncope</artifactId>
-    <version>3.0.0-SNAPSHOT</version>
+    <version>4.0.0-SNAPSHOT</version>
   </parent>
 
   <name>Apache Syncope Archetype</name>
@@ -42,7 +42,7 @@ under the License.
       <extension>
         <groupId>org.apache.maven.archetype</groupId>
         <artifactId>archetype-packaging</artifactId>
-        <version>3.2.0</version>
+        <version>3.2.1</version>
       </extension>
     </extensions>
 
@@ -105,6 +105,30 @@ under the License.
 
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>adjust-MasterContent</id>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <phase>prepare-package</phase>
+            <configuration>
+              <target>
+                <replace file="${project.build.outputDirectory}/archetype-resources/core/src/main/resources/domains/MasterContent.xml"
+                         token="http://localhost:"
+                         value="https://localhost:"/>
+                <replace file="${project.build.outputDirectory}/archetype-resources/core/src/test/resources/domains/MasterContent.xml"
+                         token="http://localhost:"
+                         value="https://localhost:"/>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
         <configuration>
           <resourceIncludes>src/main/resources/**/*.properties</resourceIncludes>
@@ -131,18 +155,18 @@ under the License.
         <includes>
           <include>core.properties</include>
         </includes>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/core/src/main/resources</targetPath>
+        <targetPath>archetype-resources/core/src/main/resources</targetPath>
       </resource>
       <resource>
         <directory>../core/provisioning-java/src/main/resources</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/core/src/main/resources</targetPath>
+        <targetPath>archetype-resources/core/src/main/resources</targetPath>
       </resource>
       <resource>
         <directory>../core/persistence-jpa/src/main/resources</directory>
         <excludes>
           <exclude>META-INF/spring-persistence.xml</exclude>
         </excludes>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/core/src/main/resources</targetPath>
+        <targetPath>archetype-resources/core/src/main/resources</targetPath>
       </resource>
       <resource>
         <directory>../core/persistence-jpa-json/src/main/resources/</directory>
@@ -150,41 +174,41 @@ under the License.
           <include>META-INF/*</include>
           <include>audit/*</include>
         </includes>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/core/src/main/resources</targetPath>
+        <targetPath>archetype-resources/core/src/main/resources</targetPath>
       </resource>
       <resource>
         <directory>../core/persistence-jpa/src/test/resources/domains</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/core/src/test/resources/domains</targetPath>
+        <targetPath>archetype-resources/core/src/test/resources/domains</targetPath>
       </resource>
       <resource>
         <directory>../fit/core-reference/src/main/resources</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/core/src/main/resources</targetPath>
+        <targetPath>archetype-resources/core/src/main/resources</targetPath>
         <includes>
           <include>log4j2.xml</include>
         </includes>
       </resource>
       <resource>
         <directory>../fit/core-reference/src/test/resources</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/core/src/test/resources</targetPath>
+        <targetPath>archetype-resources/core/src/test/resources</targetPath>
         <includes>
           <include>keystore</include>
         </includes>
       </resource>
       <resource>
         <directory>../fit/core-reference/src/test/resources/scriptedsql</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/core/src/test/resources/scriptedsql</targetPath>
+        <targetPath>archetype-resources/core/src/test/resources/scriptedsql</targetPath>
       </resource>
       <resource>
         <directory>../fit/core-reference/src/test/resources/rest</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/core/src/test/resources/rest</targetPath>
+        <targetPath>archetype-resources/core/src/test/resources/rest</targetPath>
       </resource>
       <resource>
         <directory>../fit/core-reference/src/main/webapp/WEB-INF</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/core/src/main/webapp/WEB-INF</targetPath>
+        <targetPath>archetype-resources/core/src/main/webapp/WEB-INF</targetPath>
       </resource>
       <resource>
         <directory>../fit/core-reference/src/main/resources</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/core/src/test/resources</targetPath>
+        <targetPath>archetype-resources/core/src/test/resources</targetPath>
         <includes>
           <include>core-embedded.properties</include>
           <include>core-all.properties</include>
@@ -195,25 +219,25 @@ under the License.
             
       <resource>
         <directory>../client/idrepo/console/src/main/resources</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/console/src/main/resources</targetPath>
+        <targetPath>archetype-resources/console/src/main/resources</targetPath>
         <includes>
           <include>console.properties</include>
         </includes>
       </resource>
       <resource>
         <directory>../fit/console-reference/src/main/resources</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/console/src/main/resources</targetPath>
+        <targetPath>archetype-resources/console/src/main/resources</targetPath>
         <includes>
           <include>log4j2.xml</include>
         </includes>
       </resource>
       <resource>
         <directory>../fit/console-reference/src/main/webapp/WEB-INF</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/console/src/main/webapp/WEB-INF</targetPath>
+        <targetPath>archetype-resources/console/src/main/webapp/WEB-INF</targetPath>
       </resource>
       <resource>
         <directory>../fit/console-reference/src/main/resources</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/console/src/test/resources</targetPath>
+        <targetPath>archetype-resources/console/src/test/resources</targetPath>
         <includes>
           <include>console-embedded.properties</include>
           <include>console-https.properties</include>
@@ -222,7 +246,7 @@ under the License.
       
       <resource>
         <directory>../client/idrepo/enduser/src/main/resources</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/enduser/src/main/resources</targetPath>
+        <targetPath>archetype-resources/enduser/src/main/resources</targetPath>
         <includes>
           <include>enduser.properties</include>
           <include>customFormLayout.json</include>
@@ -230,18 +254,18 @@ under the License.
       </resource>
       <resource>
         <directory>../fit/enduser-reference/src/main/resources</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/enduser/src/main/resources</targetPath>
+        <targetPath>archetype-resources/enduser/src/main/resources</targetPath>
         <includes>
           <include>log4j2.xml</include>
         </includes>
       </resource>
       <resource>
         <directory>../fit/enduser-reference/src/main/webapp/WEB-INF</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/enduser/src/main/webapp/WEB-INF</targetPath>
+        <targetPath>archetype-resources/enduser/src/main/webapp/WEB-INF</targetPath>
       </resource>
       <resource>
         <directory>../fit/enduser-reference/src/main/resources</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/enduser/src/test/resources</targetPath>
+        <targetPath>archetype-resources/enduser/src/test/resources</targetPath>
         <includes>
           <include>enduser-embedded.properties</include>
           <include>enduser-https.properties</include>
@@ -250,11 +274,11 @@ under the License.
       
       <resource>
         <directory>../sra/src/main/resources</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/sra/src/main/resources</targetPath>
+        <targetPath>archetype-resources/sra/src/main/resources</targetPath>
       </resource>
       <resource>
         <directory>../fit/wa-reference/src/test/resources</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/sra/src/test/resources</targetPath>
+        <targetPath>archetype-resources/sra/src/test/resources</targetPath>
         <includes>
           <include>sra-*.properties</include>
         </includes>
@@ -266,22 +290,22 @@ under the License.
           <include>cas-theme-default.properties</include>
           <include>wa.properties</include>
         </includes>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/wa/src/main/resources</targetPath>
+        <targetPath>archetype-resources/wa/src/main/resources</targetPath>
       </resource>
       <resource>
         <directory>../fit/wa-reference/src/main/webapp/WEB-INF</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/wa/src/main/webapp/WEB-INF</targetPath>
+        <targetPath>archetype-resources/wa/src/main/webapp/WEB-INF</targetPath>
       </resource>
       <resource>
         <directory>../fit/wa-reference/src/main/resources</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/wa/src/main/resources</targetPath>
+        <targetPath>archetype-resources/wa/src/main/resources</targetPath>
         <includes>
           <include>log4j2.xml</include>
         </includes>
       </resource>
       <resource>
         <directory>../fit/wa-reference/src/main/resources</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/wa/src/test/resources</targetPath>
+        <targetPath>archetype-resources/wa/src/test/resources</targetPath>
         <includes>
           <include>wa-embedded.properties</include>
         </includes>
@@ -289,7 +313,7 @@ under the License.
 
       <resource>
         <directory>../fit/wa-reference/src/test/resources</directory>
-        <targetPath>${project.build.outputDirectory}/archetype-resources/fit/src/test/resources</targetPath>
+        <targetPath>archetype-resources/fit/src/test/resources</targetPath>
         <includes>
           <include>keystore.jks</include>
         </includes>

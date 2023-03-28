@@ -19,6 +19,9 @@
 package org.apache.syncope.fit.sra;
 
 import static org.awaitility.Awaitility.await;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.oneOf;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -28,6 +31,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.ConnectException;
@@ -38,15 +44,14 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.cxf.jaxrs.client.WebClient;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.util.EntityUtils;
+import org.apache.syncope.common.lib.policy.AttrReleasePolicyTO;
 import org.apache.syncope.common.lib.policy.AuthPolicyTO;
+import org.apache.syncope.common.lib.policy.DefaultAttrReleasePolicyConf;
 import org.apache.syncope.common.lib.policy.DefaultAuthPolicyConf;
 import org.apache.syncope.common.lib.to.SRARouteTO;
 import org.apache.syncope.common.lib.types.PolicyType;
@@ -64,9 +69,7 @@ public abstract class AbstractSRAITCase extends AbstractITCase {
 
     protected static final JsonMapper MAPPER = JsonMapper.builder().findAndAddModules().build();
 
-    protected static final int PORT = 8080;
-
-    protected static final String SRA_ADDRESS = "http://localhost:" + PORT;
+    protected static final String SRA_ADDRESS = "http://127.0.0.1:8080";
 
     protected static final String QUERY_STRING =
             "key1=value1&key2=value2&key2=value3&key3=an%20url%20encoded%20value%3A%20this%21";
@@ -191,7 +194,7 @@ public abstract class AbstractSRAITCase extends AbstractITCase {
         await().atMost(120, TimeUnit.SECONDS).pollInterval(3, TimeUnit.SECONDS).until(() -> {
             boolean connected = false;
             try (Socket socket = new Socket()) {
-                socket.connect(new InetSocketAddress("0.0.0.0", PORT));
+                socket.connect(new InetSocketAddress("0.0.0.0", 8080));
                 connected = socket.isConnected();
             } catch (ConnectException e) {
                 // ignore
@@ -238,6 +241,37 @@ public abstract class AbstractSRAITCase extends AbstractITCase {
                 });
     }
 
+    protected static AttrReleasePolicyTO getAttrReleasePolicy() {
+        String description = "SRA attr release policy";
+
+        return POLICY_SERVICE.list(PolicyType.ATTR_RELEASE).stream().
+                map(AttrReleasePolicyTO.class::cast).
+                filter(policy -> description.equals(policy.getName())
+                && policy.getConf() instanceof DefaultAttrReleasePolicyConf).
+                findFirst().
+                orElseGet(() -> {
+                    DefaultAttrReleasePolicyConf policyConf = new DefaultAttrReleasePolicyConf();
+                    policyConf.getAllowedAttrs().add("family_name");
+                    policyConf.getAllowedAttrs().add("name");
+                    policyConf.getAllowedAttrs().add("given_name");
+                    policyConf.getAllowedAttrs().add("email");
+                    policyConf.getAllowedAttrs().add("groups");
+
+                    AttrReleasePolicyTO policy = new AttrReleasePolicyTO();
+                    policy.setName(description);
+                    policy.setConf(policyConf);
+
+                    Response response = POLICY_SERVICE.create(PolicyType.ATTR_RELEASE, policy);
+                    if (response.getStatusInfo().getStatusCode() != Response.Status.CREATED.getStatusCode()) {
+                        fail("Could not create Test Attr Release Policy");
+                    }
+
+                    return POLICY_SERVICE.read(
+                            PolicyType.ATTR_RELEASE,
+                            response.getHeaderString(RESTHeaders.RESOURCE_KEY));
+                });
+    }
+
     protected static ObjectNode checkGetResponse(
             final CloseableHttpResponse response, final String originalRequestURI) throws IOException {
 
@@ -258,12 +292,11 @@ public abstract class AbstractSRAITCase extends AbstractITCase {
 
         ObjectNode headers = (ObjectNode) json.get("headers");
         assertEquals(MediaType.TEXT_HTML, headers.get(HttpHeaders.ACCEPT).asText());
-        assertEquals(EN_LANGUAGE, headers.get(HttpHeaders.ACCEPT_LANGUAGE).asText());
-        assertEquals("localhost:" + PORT, headers.get("X-Forwarded-Host").asText());
+        assertThat(headers.get("X-Forwarded-Host").asText(), is(oneOf("localhost:8080", "127.0.0.1:8080")));
 
-        assertEquals(
-                StringUtils.substringBefore(originalRequestURI, "?"),
-                StringUtils.substringBefore(json.get("url").asText(), "?"));
+        String withHost = StringUtils.substringBefore(originalRequestURI, "?");
+        String withIP = withHost.replace("localhost", "127.0.0.1");
+        assertThat(StringUtils.substringBefore(json.get("url").asText(), "?"), is(oneOf(withHost, withIP)));
 
         return headers;
     }

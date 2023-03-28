@@ -24,7 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import javax.ws.rs.core.Response;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import jakarta.ws.rs.core.Response;
 import org.apache.syncope.client.lib.SyncopeClient;
 import org.apache.syncope.common.lib.Attr;
 import org.apache.syncope.common.lib.SyncopeClientException;
@@ -56,14 +57,13 @@ import org.apache.syncope.common.lib.types.TaskType;
 import org.apache.syncope.common.rest.api.beans.AnyQuery;
 import org.apache.syncope.common.rest.api.service.TaskService;
 import org.apache.syncope.fit.AbstractITCase;
-import org.apache.syncope.fit.ElasticsearchDetector;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 public class MembershipITCase extends AbstractITCase {
 
     @Test
-    public void misc() {
+    public void misc() throws JsonProcessingException {
         UserCR userCR = UserITCase.getUniqueSample("memb@apache.org");
         userCR.setRealm("/even/two");
         userCR.getPlainAttrs().add(new Attr.Builder("aLong").value("1976").build());
@@ -267,6 +267,7 @@ public class MembershipITCase extends AbstractITCase {
 
             // 4. create pull task and execute
             newTask = TASK_SERVICE.read(TaskType.PULL, "7c2242f4-14af-4ab5-af31-cdae23783655", true);
+            newTask.setName(getUUIDString());
             newTask.setResource(newResource.getKey());
             newTask.setDestinationRealm("/even/two");
 
@@ -279,7 +280,7 @@ public class MembershipITCase extends AbstractITCase {
             assertEquals(ExecStatus.SUCCESS, ExecStatus.valueOf(execution.getStatus()));
 
             // 5. verify that pulled user has
-            if (ElasticsearchDetector.isElasticSearchEnabled(ADMIN_CLIENT.platform())) {
+            if (IS_ELASTICSEARCH_ENABLED) {
                 try {
                     Thread.sleep(2000);
                 } catch (InterruptedException ex) {

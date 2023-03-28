@@ -21,6 +21,7 @@ package org.apache.syncope.core.spring.implementation;
 import groovy.lang.GroovyClassLoader;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -33,15 +34,16 @@ import org.apache.syncope.common.lib.policy.AccountRuleConf;
 import org.apache.syncope.common.lib.policy.PasswordRuleConf;
 import org.apache.syncope.common.lib.policy.PullCorrelationRuleConf;
 import org.apache.syncope.common.lib.policy.PushCorrelationRuleConf;
-import org.apache.syncope.common.lib.report.ReportletConf;
+import org.apache.syncope.common.lib.report.ReportConf;
 import org.apache.syncope.common.lib.types.IdRepoImplementationType;
-import org.apache.syncope.core.persistence.api.ImplementationLookup;
-import org.apache.syncope.core.persistence.api.dao.AccountRule;
-import org.apache.syncope.core.persistence.api.dao.PasswordRule;
-import org.apache.syncope.core.persistence.api.dao.PullCorrelationRule;
-import org.apache.syncope.core.persistence.api.dao.PushCorrelationRule;
-import org.apache.syncope.core.persistence.api.dao.Reportlet;
+import org.apache.syncope.common.lib.types.ImplementationTypesHolder;
 import org.apache.syncope.core.persistence.api.entity.Implementation;
+import org.apache.syncope.core.provisioning.api.ImplementationLookup;
+import org.apache.syncope.core.provisioning.api.job.report.ReportJobDelegate;
+import org.apache.syncope.core.provisioning.api.rules.AccountRule;
+import org.apache.syncope.core.provisioning.api.rules.PasswordRule;
+import org.apache.syncope.core.provisioning.api.rules.PullCorrelationRule;
+import org.apache.syncope.core.provisioning.api.rules.PushCorrelationRule;
 import org.apache.syncope.core.provisioning.api.serialization.POJOHelper;
 import org.apache.syncope.core.spring.ApplicationContextProvider;
 import org.springframework.beans.factory.support.AbstractBeanDefinition;
@@ -52,25 +54,31 @@ public final class ImplementationManager {
 
     private static final Map<String, Class<?>> CLASS_CACHE = Collections.synchronizedMap(new HashMap<>());
 
-    public static Optional<Reportlet> buildReportlet(final Implementation impl) throws ClassNotFoundException {
+    @SuppressWarnings("unchecked")
+    public static Optional<ReportJobDelegate> buildReportJobDelegate(
+            final Implementation impl,
+            final Supplier<ReportJobDelegate> cacheGetter,
+            final Consumer<ReportJobDelegate> cachePutter)
+            throws ClassNotFoundException {
+
         switch (impl.getEngine()) {
             case GROOVY:
-                return Optional.of(build(impl));
+                return Optional.of(build(impl, cacheGetter, cachePutter));
 
             case JAVA:
             default:
-                ReportletConf conf = POJOHelper.deserialize(impl.getBody(), ReportletConf.class);
-                Class<? extends Reportlet> clazz = ApplicationContextProvider.getApplicationContext().
-                        getBean(ImplementationLookup.class).getReportletClass(conf.getClass());
+                ReportConf conf = POJOHelper.deserialize(impl.getBody(), ReportConf.class);
+                Class<ReportJobDelegate> clazz =
+                        (Class<ReportJobDelegate>) ApplicationContextProvider.getApplicationContext().
+                                getBean(ImplementationLookup.class).getReportClass(conf.getClass());
 
                 if (clazz == null) {
                     return Optional.empty();
                 }
 
-                Reportlet reportlet = (Reportlet) ApplicationContextProvider.getBeanFactory().
-                        createBean(clazz, AbstractBeanDefinition.AUTOWIRE_BY_TYPE, false);
-                reportlet.setConf(conf);
-                return Optional.of(reportlet);
+                ReportJobDelegate report = build(clazz, true, cacheGetter, cachePutter);
+                report.setConf(conf);
+                return Optional.of(report);
         }
     }
 
@@ -184,6 +192,26 @@ public final class ImplementationManager {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    private static Class<? extends CommandArgs> findCommandArgsClass(final Type type) {
+        if (type.getTypeName().startsWith(
+                ImplementationTypesHolder.getInstance().getValues().get(IdRepoImplementationType.COMMAND) + "<")) {
+
+            return (Class<? extends CommandArgs>) ((ParameterizedType) type).getActualTypeArguments()[0];
+        }
+
+        if (type instanceof Class) {
+            for (Type i : ((Class) type).getGenericInterfaces()) {
+                Class<? extends CommandArgs> r = findCommandArgsClass(i);
+                if (r != null) {
+                    return r;
+                }
+            }
+        }
+
+        return null;
+    }
+
     public static CommandArgs emptyArgs(final Implementation impl) throws Exception {
         if (!IdRepoImplementationType.COMMAND.equals(impl.getType())) {
             throw new IllegalArgumentException("This method can be only called on implementations");
@@ -191,12 +219,11 @@ public final class ImplementationManager {
 
         Class<Object> commandClass = getClass(impl).getLeft();
 
-        @SuppressWarnings("unchecked")
-        Class<? extends CommandArgs> commandArgsClass =
-                (Class<? extends CommandArgs>) (((ParameterizedType) commandClass.getGenericInterfaces()[0]).
-                        getActualTypeArguments()[0]);
+        Class<? extends CommandArgs> commandArgsClass = findCommandArgsClass(commandClass);
+        if (commandArgsClass != null
+                && (commandArgsClass.getEnclosingClass() == null
+                || Modifier.isStatic(commandArgsClass.getModifiers()))) {
 
-        if (commandArgsClass.getEnclosingClass() == null || Modifier.isStatic(commandArgsClass.getModifiers())) {
             return commandArgsClass.getDeclaredConstructor().newInstance();
         }
 

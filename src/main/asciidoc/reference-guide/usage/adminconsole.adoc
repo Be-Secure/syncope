@@ -97,7 +97,7 @@ image::consoleDashboard.png[console-dashboard]
 ===== Realms
 
 The realms page provides the designated administrators with the power to manage <<realms>> as well as
-<<users-groups-and-any-objects>>, for all <<anytype, Any Types>> that are defined.
+<<users-groups-and-any-objects>>, for all <<anytype, any types>> that are defined.
 
 image::realmsUser.png[console-realms-user]
 
@@ -114,8 +114,7 @@ image::engagements.png[console-engagements]
 ===== Reports
 
 The reports page presents the designated administrators with the list of <<reports,reports>> configured on the given
-deployment. +
-This page also allows the administratorss to create and edit <<report-templates,report templates>>.
+deployment.
 
 image::consoleReports.png[console-reports]
 

@@ -38,6 +38,7 @@ import org.apache.syncope.core.persistence.api.entity.EntityFactory;
 import org.apache.syncope.core.persistence.api.entity.ExternalResource;
 import org.apache.syncope.core.persistence.api.entity.FIQLQuery;
 import org.apache.syncope.core.persistence.api.entity.Implementation;
+import org.apache.syncope.core.persistence.api.entity.JobStatus;
 import org.apache.syncope.core.persistence.api.entity.MailTemplate;
 import org.apache.syncope.core.persistence.api.entity.Notification;
 import org.apache.syncope.core.persistence.api.entity.PlainSchema;
@@ -47,10 +48,8 @@ import org.apache.syncope.core.persistence.api.entity.RelationshipType;
 import org.apache.syncope.core.persistence.api.entity.Remediation;
 import org.apache.syncope.core.persistence.api.entity.Report;
 import org.apache.syncope.core.persistence.api.entity.ReportExec;
-import org.apache.syncope.core.persistence.api.entity.ReportTemplate;
 import org.apache.syncope.core.persistence.api.entity.Role;
 import org.apache.syncope.core.persistence.api.entity.SRARoute;
-import org.apache.syncope.core.persistence.api.entity.SchemaLabel;
 import org.apache.syncope.core.persistence.api.entity.VirSchema;
 import org.apache.syncope.core.persistence.api.entity.am.AttrRepo;
 import org.apache.syncope.core.persistence.api.entity.am.AuthModule;
@@ -84,13 +83,13 @@ import org.apache.syncope.core.persistence.api.entity.policy.PullCorrelationRule
 import org.apache.syncope.core.persistence.api.entity.policy.PullPolicy;
 import org.apache.syncope.core.persistence.api.entity.policy.PushCorrelationRuleEntity;
 import org.apache.syncope.core.persistence.api.entity.policy.PushPolicy;
+import org.apache.syncope.core.persistence.api.entity.policy.TicketExpirationPolicy;
 import org.apache.syncope.core.persistence.api.entity.task.AnyTemplatePullTask;
 import org.apache.syncope.core.persistence.api.entity.task.MacroTask;
 import org.apache.syncope.core.persistence.api.entity.task.NotificationTask;
 import org.apache.syncope.core.persistence.api.entity.task.PropagationTask;
 import org.apache.syncope.core.persistence.api.entity.task.PullTask;
 import org.apache.syncope.core.persistence.api.entity.task.PushTask;
-import org.apache.syncope.core.persistence.api.entity.task.PushTaskAnyFilter;
 import org.apache.syncope.core.persistence.api.entity.task.SchedTask;
 import org.apache.syncope.core.persistence.api.entity.user.DynRoleMembership;
 import org.apache.syncope.core.persistence.api.entity.user.LAPlainAttr;
@@ -138,13 +137,13 @@ import org.apache.syncope.core.persistence.jpa.entity.policy.JPAPullCorrelationR
 import org.apache.syncope.core.persistence.jpa.entity.policy.JPAPullPolicy;
 import org.apache.syncope.core.persistence.jpa.entity.policy.JPAPushCorrelationRuleEntity;
 import org.apache.syncope.core.persistence.jpa.entity.policy.JPAPushPolicy;
+import org.apache.syncope.core.persistence.jpa.entity.policy.JPATicketExpirationPolicy;
 import org.apache.syncope.core.persistence.jpa.entity.task.JPAAnyTemplatePullTask;
 import org.apache.syncope.core.persistence.jpa.entity.task.JPAMacroTask;
 import org.apache.syncope.core.persistence.jpa.entity.task.JPANotificationTask;
 import org.apache.syncope.core.persistence.jpa.entity.task.JPAPropagationTask;
 import org.apache.syncope.core.persistence.jpa.entity.task.JPAPullTask;
 import org.apache.syncope.core.persistence.jpa.entity.task.JPAPushTask;
-import org.apache.syncope.core.persistence.jpa.entity.task.JPAPushTaskAnyFilter;
 import org.apache.syncope.core.persistence.jpa.entity.task.JPASchedTask;
 import org.apache.syncope.core.persistence.jpa.entity.user.JPADynRoleMembership;
 import org.apache.syncope.core.persistence.jpa.entity.user.JPALAPlainAttr;
@@ -230,8 +229,6 @@ public class JPAEntityFactory implements EntityFactory {
             result = (E) new JPAConnInstance();
         } else if (reference.equals(ExternalResource.class)) {
             result = (E) new JPAExternalResource();
-        } else if (reference.equals(SchemaLabel.class)) {
-            result = (E) new JPASchemaLabel();
         } else if (reference.equals(PlainSchema.class)) {
             result = (E) new JPAPlainSchema();
         } else if (reference.equals(APlainAttr.class)) {
@@ -264,8 +261,6 @@ public class JPAEntityFactory implements EntityFactory {
             result = (E) new JPAGPlainAttrUniqueValue();
         } else if (reference.equals(Report.class)) {
             result = (E) new JPAReport();
-        } else if (reference.equals(ReportTemplate.class)) {
-            result = (E) new JPAReportTemplate();
         } else if (reference.equals(ReportExec.class)) {
             result = (E) new JPAReportExec();
         } else if (reference.equals(NotificationTask.class)) {
@@ -280,8 +275,6 @@ public class JPAEntityFactory implements EntityFactory {
             result = (E) new JPAMacroTask();
         } else if (reference.equals(SchedTask.class)) {
             result = (E) new JPASchedTask();
-        } else if (reference.equals(PushTaskAnyFilter.class)) {
-            result = (E) new JPAPushTaskAnyFilter();
         } else if (reference.equals(AnyTemplatePullTask.class)) {
             result = (E) new JPAAnyTemplatePullTask();
         } else if (reference.equals(SecurityQuestion.class)) {
@@ -306,6 +299,8 @@ public class JPAEntityFactory implements EntityFactory {
             result = (E) new JPADelegation();
         } else if (reference.equals(FIQLQuery.class)) {
             result = (E) new JPAFIQLQuery();
+        } else if (reference.equals(JobStatus.class)) {
+            result = (E) new JPAJobStatus();
         } else if (reference.equals(SRARoute.class)) {
             result = (E) new JPASRARoute();
         } else if (reference.equals(AuthModule.class)) {
@@ -318,6 +313,8 @@ public class JPAEntityFactory implements EntityFactory {
             result = (E) new JPAAccessPolicy();
         } else if (reference.equals(AttrReleasePolicy.class)) {
             result = (E) new JPAAttrReleasePolicy();
+        } else if (reference.equals(TicketExpirationPolicy.class)) {
+            result = (E) new JPATicketExpirationPolicy();
         } else if (reference.equals(OIDCRPClientApp.class)) {
             result = (E) new JPAOIDCRPClientApp();
         } else if (reference.equals(CASSPClientApp.class)) {

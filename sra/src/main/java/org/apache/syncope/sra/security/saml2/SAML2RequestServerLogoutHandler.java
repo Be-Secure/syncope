@@ -22,8 +22,9 @@ import org.apache.syncope.sra.SessionConfig;
 import org.apache.syncope.sra.security.pac4j.NoOpSessionStore;
 import org.apache.syncope.sra.security.pac4j.RedirectionActionUtils;
 import org.apache.syncope.sra.security.pac4j.ServerWebExchangeContext;
+import org.pac4j.core.context.CallContext;
 import org.pac4j.saml.client.SAML2Client;
-import org.pac4j.saml.credentials.SAML2Credentials;
+import org.pac4j.saml.credentials.SAML2AuthenticationCredentials;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.CacheManager;
@@ -49,7 +50,8 @@ public class SAML2RequestServerLogoutHandler implements ServerLogoutHandler {
     public Mono<Void> logout(final WebFilterExchange exchange, final Authentication authentication) {
         return exchange.getExchange().getSession().
                 flatMap(session -> {
-                    SAML2Credentials credentials = (SAML2Credentials) authentication.getPrincipal();
+                    SAML2AuthenticationCredentials credentials = 
+                            (SAML2AuthenticationCredentials) authentication.getPrincipal();
 
                     LOG.debug("Creating SAML2 SP Logout Request for IDP[{}] and Profile[{}]",
                             saml2Client.getIdentityProviderResolvedEntityId(), credentials.getUserProfile());
@@ -57,11 +59,10 @@ public class SAML2RequestServerLogoutHandler implements ServerLogoutHandler {
                     ServerWebExchangeContext swec = new ServerWebExchangeContext(exchange.getExchange());
 
                     cacheManager.getCache(SessionConfig.DEFAULT_CACHE).evictIfPresent(session.getId());
-                    return session.invalidate().then(
-                            saml2Client.getLogoutAction(swec,
-                                NoOpSessionStore.INSTANCE, credentials.getUserProfile(), null).
-                                    map(action -> RedirectionActionUtils.handle(action, swec)).
-                                    orElseThrow(() -> new IllegalStateException("No action generated")));
+                    return session.invalidate().then(saml2Client.getLogoutAction(
+                            new CallContext(swec, NoOpSessionStore.INSTANCE), credentials.getUserProfile(), null).
+                            map(action -> RedirectionActionUtils.handle(action, swec)).
+                            orElseThrow(() -> new IllegalStateException("No action generated")));
                 }).onErrorResume(Mono::error);
     }
 }

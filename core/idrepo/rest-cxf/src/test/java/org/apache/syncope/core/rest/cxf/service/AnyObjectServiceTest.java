@@ -31,18 +31,18 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
-import com.fasterxml.jackson.jaxrs.xml.JacksonXMLProvider;
-import com.fasterxml.jackson.jaxrs.yaml.JacksonYAMLProvider;
+import com.fasterxml.jackson.jakarta.rs.json.JacksonJsonProvider;
+import com.fasterxml.jackson.jakarta.rs.xml.JacksonXMLProvider;
+import com.fasterxml.jackson.jakarta.rs.yaml.JacksonYAMLProvider;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Request;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriInfo;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.UUID;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Request;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriInfo;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.cxf.endpoint.Server;
 import org.apache.cxf.helpers.IOUtils;
@@ -228,7 +228,9 @@ public class AnyObjectServiceTest {
         assertEquals("printer1", list.getResult().get(0).getName());
         assertEquals("PRINTER", list.getResult().get(0).getType());
 
-        assertEquals("there", list.getResult().get(1).getPlainAttr("location").get().getValues().get(0));
+        Attr location = list.getResult().get(1).getPlainAttr("location").orElse(null);
+        assertNotNull(location);
+        assertEquals("there", location.getValues().get(0));
     }
 
     @Test

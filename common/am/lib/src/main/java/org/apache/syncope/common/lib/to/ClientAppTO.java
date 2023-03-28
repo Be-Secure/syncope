@@ -24,12 +24,13 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.ws.rs.PathParam;
 import java.util.ArrayList;
 import java.util.List;
-import javax.ws.rs.PathParam;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.syncope.common.lib.Attr;
+import org.apache.syncope.common.lib.clientapps.UsernameAttributeProviderConf;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.EXISTING_PROPERTY, property = "_class")
 @JsonPropertyOrder(value = { "_class", "key", "description" })
@@ -53,53 +54,31 @@ public abstract class ClientAppTO implements NamedEntityTO {
 
     private String description;
 
+    private String logo;
+
+    private String theme;
+
+    private String informationUrl;
+
+    private String privacyUrl;
+
+    private UsernameAttributeProviderConf usernameAttributeProviderConf;
+
     private String authPolicy;
 
     private String accessPolicy;
 
     private String attrReleasePolicy;
 
-    private String theme;
+    private String ticketExpirationPolicy;
 
     private final List<Attr> properties = new ArrayList<>();
 
-    @Schema(name = "_class", required = true)
+    @Schema(name = "_class", requiredMode = Schema.RequiredMode.REQUIRED)
     public abstract String getDiscriminator();
 
     public void setDiscriminator(final String discriminator) {
         // do nothing
-    }
-
-    public String getAttrReleasePolicy() {
-        return attrReleasePolicy;
-    }
-
-    public void setAttrReleasePolicy(final String attrReleasePolicy) {
-        this.attrReleasePolicy = attrReleasePolicy;
-    }
-
-    public String getAccessPolicy() {
-        return accessPolicy;
-    }
-
-    public void setAccessPolicy(final String accessPolicy) {
-        this.accessPolicy = accessPolicy;
-    }
-
-    public String getAuthPolicy() {
-        return authPolicy;
-    }
-
-    public void setAuthPolicy(final String authPolicy) {
-        this.authPolicy = authPolicy;
-    }
-
-    public String getTheme() {
-        return theme;
-    }
-
-    public void setTheme(final String theme) {
-        this.theme = theme;
     }
 
     @Override
@@ -147,6 +126,78 @@ public abstract class ClientAppTO implements NamedEntityTO {
         this.description = description;
     }
 
+    public String getLogo() {
+        return logo;
+    }
+
+    public void setLogo(final String logo) {
+        this.logo = logo;
+    }
+
+    public String getTheme() {
+        return theme;
+    }
+
+    public void setTheme(final String theme) {
+        this.theme = theme;
+    }
+
+    public String getInformationUrl() {
+        return informationUrl;
+    }
+
+    public void setInformationUrl(final String informationUrl) {
+        this.informationUrl = informationUrl;
+    }
+
+    public String getPrivacyUrl() {
+        return privacyUrl;
+    }
+
+    public void setPrivacyUrl(final String privacyUrl) {
+        this.privacyUrl = privacyUrl;
+    }
+
+    public UsernameAttributeProviderConf getUsernameAttributeProviderConf() {
+        return usernameAttributeProviderConf;
+    }
+
+    public void setUsernameAttributeProviderConf(final UsernameAttributeProviderConf usernameAttributeProviderConf) {
+        this.usernameAttributeProviderConf = usernameAttributeProviderConf;
+    }
+
+    public String getAttrReleasePolicy() {
+        return attrReleasePolicy;
+    }
+
+    public void setAttrReleasePolicy(final String attrReleasePolicy) {
+        this.attrReleasePolicy = attrReleasePolicy;
+    }
+
+    public String getAccessPolicy() {
+        return accessPolicy;
+    }
+
+    public void setAccessPolicy(final String accessPolicy) {
+        this.accessPolicy = accessPolicy;
+    }
+
+    public String getAuthPolicy() {
+        return authPolicy;
+    }
+
+    public void setAuthPolicy(final String authPolicy) {
+        this.authPolicy = authPolicy;
+    }
+
+    public String getTicketExpirationPolicy() {
+        return ticketExpirationPolicy;
+    }
+
+    public void setTicketExpirationPolicy(final String ticketExpirationPolicy) {
+        this.ticketExpirationPolicy = ticketExpirationPolicy;
+    }
+
     @JacksonXmlElementWrapper(localName = "properties")
     @JacksonXmlProperty(localName = "property")
     public List<Attr> getProperties() {
@@ -162,10 +213,15 @@ public abstract class ClientAppTO implements NamedEntityTO {
                 .append(clientAppId)
                 .append(name)
                 .append(description)
+                .append(logo)
+                .append(theme)
+                .append(informationUrl)
+                .append(privacyUrl)
+                .append(usernameAttributeProviderConf)
                 .append(authPolicy)
                 .append(accessPolicy)
                 .append(attrReleasePolicy)
-                .append(theme)
+                .append(ticketExpirationPolicy)
                 .append(properties)
                 .toHashCode();
     }
@@ -189,10 +245,15 @@ public abstract class ClientAppTO implements NamedEntityTO {
                 .append(this.clientAppId, rhs.clientAppId)
                 .append(this.name, rhs.name)
                 .append(this.description, rhs.description)
+                .append(this.logo, rhs.logo)
+                .append(this.theme, rhs.theme)
+                .append(this.informationUrl, rhs.informationUrl)
+                .append(this.privacyUrl, rhs.privacyUrl)
+                .append(this.usernameAttributeProviderConf, rhs.usernameAttributeProviderConf)
                 .append(this.authPolicy, rhs.authPolicy)
                 .append(this.accessPolicy, rhs.accessPolicy)
                 .append(this.attrReleasePolicy, rhs.attrReleasePolicy)
-                .append(this.theme, rhs.theme)
+                .append(this.ticketExpirationPolicy, rhs.ticketExpirationPolicy)
                 .append(this.properties, rhs.properties)
                 .isEquals();
     }

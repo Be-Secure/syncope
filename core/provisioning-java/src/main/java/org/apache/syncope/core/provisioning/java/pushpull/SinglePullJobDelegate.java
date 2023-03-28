@@ -32,6 +32,7 @@ import org.apache.syncope.common.lib.types.ClientExceptionType;
 import org.apache.syncope.common.lib.types.ConflictResolutionAction;
 import org.apache.syncope.common.lib.types.MatchingRule;
 import org.apache.syncope.common.lib.types.PullMode;
+import org.apache.syncope.common.lib.types.TaskType;
 import org.apache.syncope.common.lib.types.UnmatchingRule;
 import org.apache.syncope.core.persistence.api.dao.ImplementationDAO;
 import org.apache.syncope.core.persistence.api.dao.RealmDAO;
@@ -73,20 +74,22 @@ public class SinglePullJobDelegate extends PullJobDelegate implements SyncopeSin
 
         LOG.debug("Executing pull on {}", resource);
 
+        taskType = TaskType.PULL;
         try {
-            PullTask pullTask = entityFactory.newEntity(PullTask.class);
-            pullTask.setResource(resource);
-            pullTask.setMatchingRule(pullTaskTO.getMatchingRule() == null
+            task = entityFactory.newEntity(PullTask.class);
+            task.setResource(resource);
+            task.setMatchingRule(pullTaskTO.getMatchingRule() == null
                     ? MatchingRule.UPDATE : pullTaskTO.getMatchingRule());
-            pullTask.setUnmatchingRule(pullTaskTO.getUnmatchingRule() == null
+            task.setUnmatchingRule(pullTaskTO.getUnmatchingRule() == null
                     ? UnmatchingRule.PROVISION : pullTaskTO.getUnmatchingRule());
-            pullTask.setPullMode(PullMode.FILTERED_RECONCILIATION);
-            pullTask.setPerformCreate(pullTaskTO.isPerformCreate());
-            pullTask.setPerformUpdate(pullTaskTO.isPerformUpdate());
-            pullTask.setPerformDelete(pullTaskTO.isPerformDelete());
-            pullTask.setSyncStatus(pullTaskTO.isSyncStatus());
-            pullTask.setDestinationRealm(realmDAO.findByFullPath(pullTaskTO.getDestinationRealm()));
-            pullTask.setRemediation(pullTaskTO.isRemediation());
+            task.setPullMode(PullMode.FILTERED_RECONCILIATION);
+            task.setPerformCreate(pullTaskTO.isPerformCreate());
+            task.setPerformUpdate(pullTaskTO.isPerformUpdate());
+            task.setPerformDelete(pullTaskTO.isPerformDelete());
+            task.setSyncStatus(pullTaskTO.isSyncStatus());
+            task.setDestinationRealm(realmDAO.findByFullPath(pullTaskTO.getDestinationRealm()));
+            task.setRemediation(pullTaskTO.isRemediation());
+
             // validate JEXL expressions from templates and proceed if fine
             TemplateUtils.check(pullTaskTO.getTemplates(), ClientExceptionType.InvalidPullTask);
             pullTaskTO.getTemplates().forEach((type, template) -> {
@@ -94,19 +97,19 @@ public class SinglePullJobDelegate extends PullJobDelegate implements SyncopeSin
                 if (anyType == null) {
                     LOG.debug("Invalid AnyType {} specified, ignoring...", type);
                 } else {
-                    AnyTemplatePullTask anyTemplate = pullTask.getTemplate(anyType.getKey()).orElse(null);
+                    AnyTemplatePullTask anyTemplate = task.getTemplate(anyType.getKey()).orElse(null);
                     if (anyTemplate == null) {
                         anyTemplate = entityFactory.newEntity(AnyTemplatePullTask.class);
                         anyTemplate.setAnyType(anyType);
-                        anyTemplate.setPullTask(pullTask);
+                        anyTemplate.setPullTask(task);
 
-                        pullTask.add(anyTemplate);
+                        task.add(anyTemplate);
                     }
                     anyTemplate.set(template);
                 }
             });
 
-            profile = new ProvisioningProfile<>(connector, pullTask);
+            profile = new ProvisioningProfile<>(connector, task);
             profile.setDryRun(false);
             profile.setConflictResolutionAction(ConflictResolutionAction.FIRSTMATCH);
             profile.getActions().addAll(getPullActions(pullTaskTO.getActions().stream().
@@ -135,7 +138,6 @@ public class SinglePullJobDelegate extends PullJobDelegate implements SyncopeSin
                     handler = buildAnyObjectHandler();
             }
             handler.setProfile(profile);
-            handler.setPullExecutor(this);
 
             // execute filtered pull
             Set<String> matg = new HashSet<>(moreAttrsToGet);
@@ -143,7 +145,7 @@ public class SinglePullJobDelegate extends PullJobDelegate implements SyncopeSin
 
             Stream<Item> mapItems = Stream.concat(
                     MappingUtils.getPullItems(provision.getMapping().getItems().stream()),
-                    virSchemaDAO.find(pullTask.getResource().getKey(), anyType.getKey()).stream().
+                    virSchemaDAO.find(task.getResource().getKey(), anyType.getKey()).stream().
                             map(VirSchema::asLinkingMappingItem));
 
             connector.filteredReconciliation(
@@ -167,6 +169,8 @@ public class SinglePullJobDelegate extends PullJobDelegate implements SyncopeSin
             throw e instanceof JobExecutionException
                     ? (JobExecutionException) e
                     : new JobExecutionException("While pulling from connector", e);
+        } finally {
+            setStatus(null);
         }
     }
 }

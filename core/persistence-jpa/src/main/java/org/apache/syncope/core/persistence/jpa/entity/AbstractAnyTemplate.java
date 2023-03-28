@@ -18,9 +18,10 @@
  */
 package org.apache.syncope.core.persistence.jpa.entity;
 
-import javax.persistence.Lob;
-import javax.persistence.ManyToOne;
-import javax.persistence.MappedSuperclass;
+import jakarta.persistence.Lob;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.MappedSuperclass;
+import java.util.Optional;
 import org.apache.syncope.common.lib.to.AnyTO;
 import org.apache.syncope.core.persistence.api.entity.AnyTemplate;
 import org.apache.syncope.core.persistence.api.entity.AnyType;
@@ -64,10 +65,6 @@ public abstract class AbstractAnyTemplate extends AbstractGeneratedKeyEntity imp
 
     @Override
     public void set(final AnyTO template) {
-        if (template == null) {
-            this.template = null;
-        } else {
-            this.template = POJOHelper.serialize(template);
-        }
+        this.template = Optional.ofNullable(template).map(POJOHelper::serialize).orElse(null);
     }
 }

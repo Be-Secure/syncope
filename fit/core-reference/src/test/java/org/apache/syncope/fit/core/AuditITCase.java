@@ -85,7 +85,14 @@ import org.junit.jupiter.api.Test;
 
 public class AuditITCase extends AbstractITCase {
 
-    private AuditEntry queryWithFailure(final AuditQuery query, final int maxWaitSeconds) {
+    private static AuditConfTO buildAuditConf(final String auditLoggerName, final boolean active) {
+        AuditConfTO auditConfTO = new AuditConfTO();
+        auditConfTO.setActive(active);
+        auditConfTO.setKey(auditLoggerName);
+        return auditConfTO;
+    }
+
+    private static AuditEntry queryWithFailure(final AuditQuery query, final int maxWaitSeconds) {
         List<AuditEntry> results = query(query, maxWaitSeconds);
         if (results.isEmpty()) {
             fail("Timeout when executing query for key " + query.getEntityKey());
@@ -100,8 +107,7 @@ public class AuditITCase extends AbstractITCase {
         assertNotNull(userTO.getKey());
 
         AuditQuery query = new AuditQuery.Builder().entityKey(userTO.getKey()).build();
-        List<AuditEntry> entries = query(query, MAX_WAIT_SECONDS);
-        assertEquals(1, entries.size());
+        int entriesBefore = query(query, MAX_WAIT_SECONDS).size();
 
         PagedResult<UserTO> usersTOs = USER_SERVICE.search(
                 new AnyQuery.Builder().realm(SyncopeConstants.ROOT_REALM).
@@ -111,8 +117,8 @@ public class AuditITCase extends AbstractITCase {
         assertNotNull(usersTOs);
         assertFalse(usersTOs.getResult().isEmpty());
 
-        entries = query(query, MAX_WAIT_SECONDS);
-        assertEquals(1, entries.size());
+        int entriesAfter = query(query, MAX_WAIT_SECONDS).size();
+        assertEquals(entriesBefore, entriesAfter);
     }
 
     @Test
@@ -120,8 +126,13 @@ public class AuditITCase extends AbstractITCase {
         UserTO userTO = createUser(UserITCase.getUniqueSample("audit@syncope.org")).getEntity();
         assertNotNull(userTO.getKey());
 
-        AuditQuery query = new AuditQuery.Builder().entityKey(userTO.getKey()).orderBy("event_date desc").
-                page(1).size(1).build();
+        AuditQuery query = new AuditQuery.Builder().
+                entityKey(userTO.getKey()).
+                before(OffsetDateTime.now().plusSeconds(30)).
+                page(1).
+                size(1).
+                orderBy("event_date desc").
+                build();
         AuditEntry entry = queryWithFailure(query, MAX_WAIT_SECONDS);
         assertNotNull(entry);
         USER_SERVICE.delete(userTO.getKey());
@@ -141,6 +152,7 @@ public class AuditITCase extends AbstractITCase {
                 category(UserLogic.class.getSimpleName()).
                 event("create").
                 result(AuditElements.Result.SUCCESS).
+                after(OffsetDateTime.now().minusSeconds(30)).
                 build();
         AuditEntry entry = queryWithFailure(query, MAX_WAIT_SECONDS);
         assertNotNull(entry);
@@ -165,8 +177,7 @@ public class AuditITCase extends AbstractITCase {
         assertNotNull(groupTO.getKey());
 
         AuditQuery query = new AuditQuery.Builder().entityKey(groupTO.getKey()).build();
-        List<AuditEntry> entries = query(query, MAX_WAIT_SECONDS);
-        assertEquals(1, entries.size());
+        int entriesBefore = query(query, MAX_WAIT_SECONDS).size();
 
         PagedResult<GroupTO> groups = GROUP_SERVICE.search(new AnyQuery.Builder().realm(SyncopeConstants.ROOT_REALM).
                 fiql(SyncopeClient.getGroupSearchConditionBuilder().is("name").equalTo(groupTO.getName()).query()).
@@ -174,8 +185,8 @@ public class AuditITCase extends AbstractITCase {
         assertNotNull(groups);
         assertFalse(groups.getResult().isEmpty());
 
-        entries = query(query, MAX_WAIT_SECONDS);
-        assertEquals(1, entries.size());
+        int entriesAfter = query(query, MAX_WAIT_SECONDS).size();
+        assertEquals(entriesBefore, entriesAfter);
     }
 
     @Test
@@ -195,8 +206,7 @@ public class AuditITCase extends AbstractITCase {
         assertNotNull(anyObjectTO);
 
         AuditQuery query = new AuditQuery.Builder().entityKey(anyObjectTO.getKey()).build();
-        List<AuditEntry> entries = query(query, MAX_WAIT_SECONDS);
-        assertEquals(1, entries.size());
+        int entriesBefore = query(query, MAX_WAIT_SECONDS).size();
 
         PagedResult<AnyObjectTO> anyObjects = ANY_OBJECT_SERVICE.search(
                 new AnyQuery.Builder().realm(SyncopeConstants.ROOT_REALM).
@@ -205,8 +215,8 @@ public class AuditITCase extends AbstractITCase {
         assertNotNull(anyObjects);
         assertFalse(anyObjects.getResult().isEmpty());
 
-        entries = query(query, MAX_WAIT_SECONDS);
-        assertEquals(1, entries.size());
+        int entriesAfter = query(query, MAX_WAIT_SECONDS).size();
+        assertEquals(entriesBefore, entriesAfter);
     }
 
     @Test
@@ -392,6 +402,14 @@ public class AuditITCase extends AbstractITCase {
         auditEntry.setOutput(UUID.randomUUID().toString());
         assertDoesNotThrow(() -> AUDIT_SERVICE.create(auditEntry));
 
+        if (IS_ELASTICSEARCH_ENABLED) {
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException ex) {
+                // ignore
+            }
+        }
+
         PagedResult<AuditEntry> events = AUDIT_SERVICE.search(new AuditQuery.Builder().
                 size(1).
                 type(auditEntry.getLogger().getType()).
@@ -418,6 +436,14 @@ public class AuditITCase extends AbstractITCase {
         auditEntry.setBefore(UUID.randomUUID().toString());
         auditEntry.setOutput(UUID.randomUUID().toString());
         assertDoesNotThrow(() -> AUDIT_SERVICE.create(auditEntry));
+
+        if (IS_ELASTICSEARCH_ENABLED) {
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException ex) {
+                // ignore
+            }
+        }
 
         PagedResult<AuditEntry> events = AUDIT_SERVICE.search(new AuditQuery.Builder().
                 size(1).
@@ -461,7 +487,7 @@ public class AuditITCase extends AbstractITCase {
                     auditFilePath,
                     content -> content.contains(
                             "DEBUG Master.syncope.audit.[LOGIC]:[ResourceLogic]:[]:[update]:[SUCCESS]"
-                                    + " - This is a static test message"),
+                            + " - This is a static test message"),
                     10);
 
             // nothing expected in audit_for_Master_norewrite_file.log instead
@@ -469,7 +495,7 @@ public class AuditITCase extends AbstractITCase {
                     auditNoRewriteFilePath,
                     content -> !content.contains(
                             "DEBUG Master.syncope.audit.[LOGIC]:[ResourceLogic]:[]:[update]:[SUCCESS]"
-                                    + " - This is a static test message"),
+                            + " - This is a static test message"),
                     10);
         } catch (IOException e) {
             fail("Unable to read/write log files", e);
@@ -584,25 +610,30 @@ public class AuditITCase extends AbstractITCase {
             pullTaskTO.setDestinationRealm(SyncopeConstants.ROOT_REALM);
             pullTaskTO.setMatchingRule(MatchingRule.UPDATE);
             pullTaskTO.setUnmatchingRule(UnmatchingRule.ASSIGN);
-            RECONCILIATION_SERVICE.pull(
-                    new ReconQuery.Builder(AnyTypeKind.USER.name(), RESOURCE_NAME_LDAP).fiql("uid==pullFromLDAP")
-                            .build(),
-                    pullTaskTO);
+            RECONCILIATION_SERVICE.pull(new ReconQuery.Builder(AnyTypeKind.USER.name(), RESOURCE_NAME_LDAP).
+                    fiql("uid==pullFromLDAP").build(), pullTaskTO);
+
             // update pullTaskTO -> another audit entry
-            pullFromLDAP = updateUser(new UserUR.Builder(USER_SERVICE.read("pullFromLDAP").getKey())
-                    .plainAttr(new AttrPatch.Builder(new Attr.Builder("ctype").value("abcdef").build()).build())
-                    .build()).getEntity();
+            pullFromLDAP = updateUser(new UserUR.Builder(USER_SERVICE.read("pullFromLDAP").getKey()).
+                    plainAttr(new AttrPatch.Builder(new Attr.Builder("ctype").value("abcdef").build()).build()).
+                    build()).getEntity();
+
             // search by empty type and category events and get both events on testfromLDAP
-            assertEquals(2,
-                    AUDIT_SERVICE.search(new AuditQuery.Builder()
-                            .entityKey(pullFromLDAP.getKey())
-                            .page(1)
-                            .size(10)
-                            .events(List.of(
-                                    "create", "update", "matchingrule_update", "unmatchingrule_assign",
-                                    "unmatchingrule_provision"))
-                            .result(AuditElements.Result.SUCCESS)
-                            .build()).getTotalCount());
+            if (IS_ELASTICSEARCH_ENABLED) {
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException ex) {
+                    // ignore
+                }
+            }
+
+            assertEquals(1, AUDIT_SERVICE.search(new AuditQuery.Builder().
+                    entityKey(pullFromLDAP.getKey()).
+                    page(1).
+                    size(10).
+                    events(List.of("matchingrule_update", "unmatchingrule_assign", "unmatchingrule_provision")).
+                    result(AuditElements.Result.SUCCESS).
+                    build()).getTotalCount());
         } finally {
             if (pullFromLDAP != null) {
                 USER_SERVICE.deassociate(new ResourceDR.Builder()
@@ -624,12 +655,5 @@ public class AuditITCase extends AbstractITCase {
                         false));
             }
         }
-    }
-
-    private static AuditConfTO buildAuditConf(final String auditLoggerName, final boolean active) {
-        AuditConfTO auditConfTO = new AuditConfTO();
-        auditConfTO.setActive(active);
-        auditConfTO.setKey(auditLoggerName);
-        return auditConfTO;
     }
 }

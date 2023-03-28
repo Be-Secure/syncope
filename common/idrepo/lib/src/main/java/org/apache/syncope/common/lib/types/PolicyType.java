@@ -41,6 +41,10 @@ public enum PolicyType {
      */
     ACCESS,
     /**
+     * Controls expiration of access tickets.
+     */
+    TICKET_EXPIRATION,
+    /**
      * For handling propagation behavior.
      */
     PROPAGATION,

@@ -23,12 +23,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.cxf.jaxrs.client.WebClient;
@@ -124,6 +124,7 @@ public class SAML2SP4UIITCase extends AbstractUIITCase {
         cas.setName("CAS");
         cas.setCreateUnmatching(true);
         cas.setSelfRegUnmatching(false);
+
         cas.getItems().clear();
 
         Item item = new Item();
@@ -257,9 +258,12 @@ public class SAML2SP4UIITCase extends AbstractUIITCase {
             post.setEntity(new UrlEncodedFormEntity(form, Consts.UTF_8));
             try (CloseableHttpResponse response = httpclient.execute(post, context)) {
                 assertEquals(HttpStatus.SC_MOVED_TEMPORARILY, response.getStatusLine().getStatusCode());
-                location = response.getFirstHeader(HttpHeaders.LOCATION).getValue().
-                        replace("http://", "https://").replace(":8080", ":9443");
+                location = response.getFirstHeader(HttpHeaders.LOCATION).getValue();
             }
+        }
+
+        if (location.startsWith("http://localhost:8080/syncope-wa")) {
+            location = WA_ADDRESS + StringUtils.substringAfter(location, "http://localhost:8080/syncope-wa");
         }
 
         get = new HttpGet(location);

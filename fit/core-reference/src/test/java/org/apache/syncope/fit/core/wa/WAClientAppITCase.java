@@ -31,8 +31,9 @@ import org.apache.syncope.client.lib.SyncopeClientFactoryBean;
 import org.apache.syncope.common.lib.policy.AccessPolicyTO;
 import org.apache.syncope.common.lib.policy.AttrReleasePolicyTO;
 import org.apache.syncope.common.lib.policy.AuthPolicyTO;
-import org.apache.syncope.common.lib.to.AuthModuleTO;
-import org.apache.syncope.common.lib.to.Item;
+import org.apache.syncope.common.lib.policy.DefaultAttrReleasePolicyConf;
+import org.apache.syncope.common.lib.policy.DefaultTicketExpirationPolicyConf;
+import org.apache.syncope.common.lib.policy.TicketExpirationPolicyTO;
 import org.apache.syncope.common.lib.to.OIDCRPClientAppTO;
 import org.apache.syncope.common.lib.to.SAML2SPClientAppTO;
 import org.apache.syncope.common.lib.types.ClientAppType;
@@ -105,55 +106,29 @@ public class WAClientAppITCase extends AbstractITCase {
 
         AttrReleasePolicyTO attrReleasePolicyTO = createPolicy(PolicyType.ATTR_RELEASE, buildAttrReleasePolicyTO());
 
+        TicketExpirationPolicyTO ticketExpirationPolicyTO =
+                createPolicy(PolicyType.TICKET_EXPIRATION, buildTicketExpirationPolicyTO());
+
         oidcrpto.setAuthPolicy(authPolicyTO.getKey());
         oidcrpto.setAccessPolicy(accessPolicyTO.getKey());
         oidcrpto.setAttrReleasePolicy(attrReleasePolicyTO.getKey());
+        oidcrpto.setTicketExpirationPolicy(ticketExpirationPolicyTO.getKey());
 
         oidcrpto = createClientApp(ClientAppType.OIDCRP, oidcrpto);
 
         WAClientApp waClientApp = WA_CLIENT_APP_SERVICE.read(oidcrpto.getClientAppId(), null);
         assertNotNull(waClientApp);
-        assertTrue(waClientApp.getReleaseAttrs().isEmpty());
+        assertTrue(waClientApp.getAttrReleasePolicy().getConf() instanceof DefaultAttrReleasePolicyConf);
+        assertTrue(waClientApp.getTicketExpirationPolicy().getConf() instanceof DefaultTicketExpirationPolicyConf);
 
-        // add items to the authentication module
-        addItems();
-        try {
-            waClientApp = WA_CLIENT_APP_SERVICE.read(oidcrpto.getClientAppId(), null);
-            assertNotNull(waClientApp);
-            assertFalse(waClientApp.getReleaseAttrs().isEmpty());
-            assertEquals("username", waClientApp.getReleaseAttrs().get("uid"));
-            assertEquals("fullname", waClientApp.getReleaseAttrs().get("cn"));
-        } finally {
-            removeItems();
-        }
-    }
+        DefaultAttrReleasePolicyConf attrReleasePolicyConf =
+                (DefaultAttrReleasePolicyConf) waClientApp.getAttrReleasePolicy().getConf();
+        assertFalse(attrReleasePolicyConf.getReleaseAttrs().isEmpty());
+        assertEquals("username", attrReleasePolicyConf.getReleaseAttrs().get("uid"));
+        assertEquals("fullname", attrReleasePolicyConf.getReleaseAttrs().get("cn"));
 
-    private void addItems() {
-        AuthModuleTO authModuleTO = AUTH_MODULE_SERVICE.read(AUTH_MODULE);
-
-        Item keyMapping = new Item();
-        keyMapping.setIntAttrName("uid");
-        keyMapping.setExtAttrName("username");
-        authModuleTO.getItems().add(keyMapping);
-
-        Item fullnameMapping = new Item();
-        fullnameMapping.setIntAttrName("cn");
-        fullnameMapping.setExtAttrName("fullname");
-        authModuleTO.getItems().add(fullnameMapping);
-
-        AUTH_MODULE_SERVICE.update(authModuleTO);
-
-        authModuleTO = AUTH_MODULE_SERVICE.read(AUTH_MODULE);
-        assertFalse(authModuleTO.getItems().isEmpty());
-    }
-
-    private void removeItems() {
-        AuthModuleTO authModuleTO = AUTH_MODULE_SERVICE.read(AUTH_MODULE);
-        authModuleTO.getItems().clear();
-
-        AUTH_MODULE_SERVICE.update(authModuleTO);
-
-        authModuleTO = AUTH_MODULE_SERVICE.read(AUTH_MODULE);
-        assertTrue(authModuleTO.getItems().isEmpty());
+        DefaultTicketExpirationPolicyConf ticketExpirationPolicyConf =
+                (DefaultTicketExpirationPolicyConf) waClientApp.getTicketExpirationPolicy().getConf();
+        assertEquals(110, ticketExpirationPolicyConf.getTgtConf().getMaxTimeToLiveInSeconds());
     }
 }

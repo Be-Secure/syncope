@@ -24,7 +24,7 @@ under the License.
   <parent>
     <groupId>org.apache.syncope.ext</groupId>
     <artifactId>syncope-ext-flowable</artifactId>
-    <version>3.0.0-SNAPSHOT</version>
+    <version>4.0.0-SNAPSHOT</version>
   </parent>
 
   <name>Apache Syncope Ext: Flowable Client Console</name>
@@ -85,9 +85,9 @@ under the License.
             <phase>process-resources</phase>
             <configuration>
               <target>
-                <unzip src="${settings.localRepository}/org/flowable/flowable-ui-modeler-frontend/${flowable.version}/flowable-ui-modeler-frontend-${flowable.version}.jar" dest="${flowable-modeler.directory}"/>
+                <unzip src="${settings.localRepository}/org/flowable/flowable-ui-modeler-frontend/${flowable-old.version}/flowable-ui-modeler-frontend-${flowable-old.version}.jar" dest="${flowable-modeler.directory}"/>
 
-                <unzip src="${settings.localRepository}/org/flowable/flowable-ui-modeler-logic/${flowable.version}/flowable-ui-modeler-logic-${flowable.version}.jar" dest="${flowable-modeler.directory}">
+                <unzip src="${settings.localRepository}/org/flowable/flowable-ui-modeler-logic/${flowable-old.version}/flowable-ui-modeler-logic-${flowable-old.version}.jar" dest="${flowable-modeler.directory}">
                   <patternset>
                     <include name="stencilset_bpmn.json"/>
                   </patternset>

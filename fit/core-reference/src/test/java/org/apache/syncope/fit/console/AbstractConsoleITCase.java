@@ -30,9 +30,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.Set;
+import org.apache.syncope.client.console.AMConsoleContext;
 import org.apache.syncope.client.console.ConsoleProperties;
-import org.apache.syncope.client.console.SyncopeAMConsoleContext;
-import org.apache.syncope.client.console.SyncopeIdMConsoleContext;
+import org.apache.syncope.client.console.IdMConsoleContext;
 import org.apache.syncope.client.console.SyncopeWebApplication;
 import org.apache.syncope.client.console.commons.IdRepoPolicyTabProvider;
 import org.apache.syncope.client.console.commons.PolicyTabProvider;
@@ -40,9 +40,7 @@ import org.apache.syncope.client.console.commons.PreviewUtils;
 import org.apache.syncope.client.console.init.ClassPathScanImplementationLookup;
 import org.apache.syncope.client.console.pages.Login;
 import org.apache.syncope.client.console.topology.Topology;
-import org.apache.syncope.client.console.wizards.any.UserFormFinalizerUtils;
 import org.apache.syncope.client.lib.SyncopeClientFactoryBean;
-import org.apache.syncope.client.ui.commons.ApplicationContextProvider;
 import org.apache.syncope.client.ui.commons.MIMETypesLoader;
 import org.apache.syncope.common.keymaster.client.self.SelfKeymasterClientContext;
 import org.apache.syncope.common.keymaster.client.zookeeper.ZookeeperKeymasterClientContext;
@@ -98,11 +96,6 @@ public abstract class AbstractConsoleITCase extends AbstractUIITCase {
         }
 
         @Bean
-        public ApplicationContextProvider applicationContextProvider() {
-            return new ApplicationContextProvider();
-        }
-
-        @Bean
         public ClassPathScanImplementationLookup classPathScanImplementationLookup() {
             ClassPathScanImplementationLookup lookup = new ClassPathScanImplementationLookup(Set.of(),
                     consoleProperties());
@@ -120,11 +113,6 @@ public abstract class AbstractConsoleITCase extends AbstractUIITCase {
         @Bean
         public PreviewUtils previewUtils() {
             return new PreviewUtils();
-        }
-
-        @Bean
-        public UserFormFinalizerUtils userFormFinalizerUtils() {
-            return new UserFormFinalizerUtils();
         }
 
         @Bean
@@ -147,8 +135,8 @@ public abstract class AbstractConsoleITCase extends AbstractUIITCase {
 
         ctx.register(SyncopeConsoleWebApplicationTestConfig.class);
         ctx.register(SyncopeWebApplication.class);
-        ctx.register(SyncopeAMConsoleContext.class);
-        ctx.register(SyncopeIdMConsoleContext.class);
+        ctx.register(AMConsoleContext.class);
+        ctx.register(IdMConsoleContext.class);
 
         String springActiveProfiles = null;
         try (InputStream propStream = AbstractConsoleITCase.class.getResourceAsStream("/test.properties")) {

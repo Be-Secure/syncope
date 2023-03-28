@@ -18,6 +18,9 @@
  */
 package org.apache.syncope.core.persistence.jpa.dao;
 
+import jakarta.persistence.NoResultException;
+import jakarta.persistence.Query;
+import jakarta.persistence.TypedQuery;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -26,12 +29,9 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-import javax.persistence.NoResultException;
-import javax.persistence.Query;
-import javax.persistence.TypedQuery;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.syncope.common.lib.types.AnyEntitlement;
 import org.apache.syncope.common.lib.types.AnyTypeKind;
@@ -137,8 +137,10 @@ public class JPAAnyObjectDAO extends AbstractAnyDAO<AnyObject> implements AnyObj
             final Collection<String> groups) {
 
         // 1. check if AuthContextUtils.getUsername() is owner of at least one group of which anyObject is member
-        boolean authorized = authRealms.stream().map(RealmUtils::parseGroupOwnerRealm).filter(Optional::isPresent).
-                anyMatch(pair -> groups.contains(pair.get().getRight()));
+        boolean authorized = authRealms.stream().
+                map(authRealm -> RealmUtils.parseGroupOwnerRealm(authRealm).orElse(null)).
+                filter(Objects::nonNull).
+                anyMatch(pair -> groups.contains(pair.getRight()));
 
         // 2. check if anyObject is in at least one DynRealm for which AuthContextUtils.getUsername() owns entitlement
         if (!authorized) {

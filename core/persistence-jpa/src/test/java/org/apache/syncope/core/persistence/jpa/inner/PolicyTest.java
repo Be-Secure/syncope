@@ -26,13 +26,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.UUID;
-import org.apache.syncope.common.lib.Attr;
 import org.apache.syncope.common.lib.policy.DefaultAccessPolicyConf;
 import org.apache.syncope.common.lib.policy.DefaultAttrReleasePolicyConf;
 import org.apache.syncope.common.lib.policy.DefaultAuthPolicyConf;
 import org.apache.syncope.common.lib.policy.DefaultPasswordRuleConf;
 import org.apache.syncope.common.lib.policy.DefaultPullCorrelationRuleConf;
 import org.apache.syncope.common.lib.policy.DefaultPushCorrelationRuleConf;
+import org.apache.syncope.common.lib.policy.DefaultTicketExpirationPolicyConf;
 import org.apache.syncope.common.lib.types.AnyTypeKind;
 import org.apache.syncope.common.lib.types.BackOffStrategy;
 import org.apache.syncope.common.lib.types.ConflictResolutionAction;
@@ -42,8 +42,6 @@ import org.apache.syncope.common.lib.types.ImplementationEngine;
 import org.apache.syncope.core.persistence.api.dao.AnyTypeDAO;
 import org.apache.syncope.core.persistence.api.dao.ImplementationDAO;
 import org.apache.syncope.core.persistence.api.dao.PolicyDAO;
-import org.apache.syncope.core.persistence.api.dao.PullCorrelationRule;
-import org.apache.syncope.core.persistence.api.dao.PushCorrelationRule;
 import org.apache.syncope.core.persistence.api.entity.Implementation;
 import org.apache.syncope.core.persistence.api.entity.policy.AccessPolicy;
 import org.apache.syncope.core.persistence.api.entity.policy.AttrReleasePolicy;
@@ -55,7 +53,10 @@ import org.apache.syncope.core.persistence.api.entity.policy.PullCorrelationRule
 import org.apache.syncope.core.persistence.api.entity.policy.PullPolicy;
 import org.apache.syncope.core.persistence.api.entity.policy.PushCorrelationRuleEntity;
 import org.apache.syncope.core.persistence.api.entity.policy.PushPolicy;
+import org.apache.syncope.core.persistence.api.entity.policy.TicketExpirationPolicy;
 import org.apache.syncope.core.persistence.jpa.AbstractTest;
+import org.apache.syncope.core.provisioning.api.rules.PullCorrelationRule;
+import org.apache.syncope.core.provisioning.api.rules.PushCorrelationRule;
 import org.apache.syncope.core.provisioning.api.serialization.POJOHelper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -154,6 +155,10 @@ public class PolicyTest extends AbstractTest {
         List<AttrReleasePolicy> attrReleasePolicies = policyDAO.find(AttrReleasePolicy.class);
         assertNotNull(attrReleasePolicies);
         assertEquals(2, attrReleasePolicies.size());
+
+        List<TicketExpirationPolicy> ticketExpirationPolicies = policyDAO.find(TicketExpirationPolicy.class);
+        assertNotNull(ticketExpirationPolicies);
+        assertEquals(0, ticketExpirationPolicies.size());
     }
 
     @Test
@@ -272,7 +277,7 @@ public class PolicyTest extends AbstractTest {
         accessPolicy.setName("AttrReleasePolicyAllowEverything");
 
         DefaultAccessPolicyConf conf = new DefaultAccessPolicyConf();
-        conf.getRequiredAttrs().add(new Attr.Builder("cn").value("syncope").build());
+        conf.getRequiredAttrs().put("cn", "syncope");
         accessPolicy.setConf(conf);
 
         accessPolicy = policyDAO.save(accessPolicy);
@@ -324,6 +329,34 @@ public class PolicyTest extends AbstractTest {
         assertNotNull(attrReleasePolicy.getKey());
         assertNotNull(attrReleasePolicy.getStatus());
         assertNotNull(((DefaultAttrReleasePolicyConf) attrReleasePolicy.getConf()).getAllowedAttrs());
+
+        int afterCount = policyDAO.findAll().size();
+        assertEquals(afterCount, beforeCount + 1);
+    }
+
+    @Test
+    public void createTicketExpiration() {
+        int beforeCount = policyDAO.findAll().size();
+
+        TicketExpirationPolicy ticketExpirationPolicy = entityFactory.newEntity(TicketExpirationPolicy.class);
+        ticketExpirationPolicy.setName("TicketExpirationPolicyTest");
+
+        DefaultTicketExpirationPolicyConf ticketExpirationPolicyConf = new DefaultTicketExpirationPolicyConf();
+        DefaultTicketExpirationPolicyConf.TGTConf tgtConf = new DefaultTicketExpirationPolicyConf.TGTConf();
+        tgtConf.setMaxTimeToLiveInSeconds(110);
+        ticketExpirationPolicyConf.setTgtConf(tgtConf);
+        DefaultTicketExpirationPolicyConf.STConf stConf = new DefaultTicketExpirationPolicyConf.STConf();
+        stConf.setMaxTimeToLiveInSeconds(0);
+        stConf.setNumberOfUses(1);
+        ticketExpirationPolicyConf.setStConf(stConf);
+        ticketExpirationPolicy.setConf(ticketExpirationPolicyConf);
+
+        ticketExpirationPolicy = policyDAO.save(ticketExpirationPolicy);
+
+        assertNotNull(ticketExpirationPolicy);
+        assertNotNull(ticketExpirationPolicy.getKey());
+        assertNotNull(((DefaultTicketExpirationPolicyConf) ticketExpirationPolicy.getConf()).getTgtConf());
+        assertNotNull(((DefaultTicketExpirationPolicyConf) ticketExpirationPolicy.getConf()).getStConf());
 
         int afterCount = policyDAO.findAll().size();
         assertEquals(afterCount, beforeCount + 1);

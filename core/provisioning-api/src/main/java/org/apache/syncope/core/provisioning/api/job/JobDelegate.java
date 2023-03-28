@@ -23,7 +23,7 @@ package org.apache.syncope.core.provisioning.api.job;
  */
 public interface JobDelegate {
 
-    String currentStatus();
+    String OPERATION_ID = "operation.id";
 
     void interrupt();
 

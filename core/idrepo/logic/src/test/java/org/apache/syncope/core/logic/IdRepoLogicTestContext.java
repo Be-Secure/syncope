@@ -18,16 +18,18 @@
  */
 package org.apache.syncope.core.logic;
 
+import static org.mockito.Mockito.mock;
+
 import org.apache.syncope.common.keymaster.client.api.ConfParamOps;
 import org.apache.syncope.common.keymaster.client.api.DomainOps;
 import org.apache.syncope.common.keymaster.client.api.ServiceOps;
 import org.apache.syncope.core.persistence.api.DomainHolder;
 import org.apache.syncope.core.persistence.api.DomainRegistry;
-import org.apache.syncope.core.persistence.api.ImplementationLookup;
 import org.apache.syncope.core.persistence.api.content.ContentLoader;
 import org.apache.syncope.core.persistence.jpa.MasterDomain;
 import org.apache.syncope.core.persistence.jpa.PersistenceContext;
 import org.apache.syncope.core.persistence.jpa.StartupDomainLoader;
+import org.apache.syncope.core.provisioning.api.ImplementationLookup;
 import org.apache.syncope.core.provisioning.java.ProvisioningContext;
 import org.apache.syncope.core.spring.security.SecurityContext;
 import org.apache.syncope.core.workflow.java.WorkflowContext;
@@ -36,6 +38,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.PropertySource;
+import org.springframework.mail.javamail.JavaMailSender;
 
 @PropertySource("classpath:core-test.properties")
 @Import({ IdRepoLogicContext.class, IdRepoLogicContext.class, SecurityContext.class,
@@ -51,6 +54,11 @@ public class IdRepoLogicTestContext {
             final ConfigurableApplicationContext ctx) {
 
         return new TestInitializer(domainLoader, domainHolder, contentLoader, ctx);
+    }
+
+    @Bean
+    public JavaMailSender javaMailSender() {
+        return mock(JavaMailSender.class);
     }
 
     @Bean

@@ -37,6 +37,7 @@ import org.apache.syncope.core.persistence.api.entity.policy.AccessPolicy;
 import org.apache.syncope.core.persistence.api.entity.policy.AttrReleasePolicy;
 import org.apache.syncope.core.persistence.api.entity.policy.AuthPolicy;
 import org.apache.syncope.core.persistence.api.entity.policy.Policy;
+import org.apache.syncope.core.persistence.api.entity.policy.TicketExpirationPolicy;
 import org.apache.syncope.core.provisioning.api.data.ClientAppDataBinder;
 
 public class ClientAppDataBinderImpl implements ClientAppDataBinder {
@@ -62,13 +63,15 @@ public class ClientAppDataBinderImpl implements ClientAppDataBinder {
     public <T extends ClientApp> T create(final ClientAppTO clientAppTO) {
         if (clientAppTO instanceof SAML2SPClientAppTO) {
             return (T) doCreate((SAML2SPClientAppTO) clientAppTO);
-        } else if (clientAppTO instanceof OIDCRPClientAppTO) {
-            return (T) doCreate((OIDCRPClientAppTO) clientAppTO);
-        } else if (clientAppTO instanceof CASSPClientAppTO) {
-            return (T) doCreate((CASSPClientAppTO) clientAppTO);
-        } else {
-            throw new IllegalArgumentException("Unsupported client app: " + clientAppTO.getClass().getName());
         }
+        if (clientAppTO instanceof OIDCRPClientAppTO) {
+            return (T) doCreate((OIDCRPClientAppTO) clientAppTO);
+        }
+        if (clientAppTO instanceof CASSPClientAppTO) {
+            return (T) doCreate((CASSPClientAppTO) clientAppTO);
+        }
+
+        throw new IllegalArgumentException("Unsupported client app: " + clientAppTO.getClass().getName());
     }
 
     @Override
@@ -154,16 +157,22 @@ public class ClientAppDataBinderImpl implements ClientAppDataBinder {
         clientAppTO.setKey(clientApp.getKey());
         clientAppTO.setRealm(Optional.ofNullable(clientApp.getRealm()).map(Realm::getFullPath).orElse(null));
         clientAppTO.setName(clientApp.getName());
-        clientAppTO.setDescription(clientApp.getDescription());
         clientAppTO.setClientAppId(clientApp.getClientAppId());
+        clientAppTO.setDescription(clientApp.getDescription());
+        clientAppTO.setLogo(clientApp.getLogo());
         clientAppTO.setTheme(clientApp.getTheme());
+        clientAppTO.setInformationUrl(clientApp.getInformationUrl());
+        clientAppTO.setPrivacyUrl(clientApp.getPrivacyUrl());
+        clientAppTO.setUsernameAttributeProviderConf(clientApp.getUsernameAttributeProviderConf());
 
-        clientAppTO.setAuthPolicy(
-                Optional.ofNullable(clientApp.getAuthPolicy()).map(AuthPolicy::getKey).orElse(null));
-        clientAppTO.setAccessPolicy(
-                Optional.ofNullable(clientApp.getAccessPolicy()).map(AccessPolicy::getKey).orElse(null));
-        clientAppTO.setAttrReleasePolicy(
-                Optional.ofNullable(clientApp.getAttrReleasePolicy()).map(AttrReleasePolicy::getKey).orElse(null));
+        clientAppTO.setAuthPolicy(Optional.ofNullable(clientApp.getAuthPolicy()).
+                map(AuthPolicy::getKey).orElse(null));
+        clientAppTO.setAccessPolicy(Optional.ofNullable(clientApp.getAccessPolicy()).
+                map(AccessPolicy::getKey).orElse(null));
+        clientAppTO.setAttrReleasePolicy(Optional.ofNullable(clientApp.getAttrReleasePolicy()).
+                map(AttrReleasePolicy::getKey).orElse(null));
+        clientAppTO.setTicketExpirationPolicy(Optional.ofNullable(clientApp.getTicketExpirationPolicy()).
+                map(TicketExpirationPolicy::getKey).orElse(null));
 
         clientAppTO.getProperties().addAll(clientApp.getProperties());
     }
@@ -224,6 +233,8 @@ public class ClientAppDataBinderImpl implements ClientAppDataBinder {
         clientApp.getSupportedGrantTypes().addAll(clientAppTO.getSupportedGrantTypes());
         clientApp.getSupportedResponseTypes().clear();
         clientApp.getSupportedResponseTypes().addAll(clientAppTO.getSupportedResponseTypes());
+        clientApp.getScopes().clear();
+        clientApp.getScopes().addAll(clientAppTO.getScopes());
         clientApp.setLogoutUri(clientAppTO.getLogoutUri());
     }
 
@@ -238,6 +249,7 @@ public class ClientAppDataBinderImpl implements ClientAppDataBinder {
         clientAppTO.getRedirectUris().addAll(clientApp.getRedirectUris());
         clientAppTO.getSupportedGrantTypes().addAll(clientApp.getSupportedGrantTypes());
         clientAppTO.getSupportedResponseTypes().addAll(clientApp.getSupportedResponseTypes());
+        clientAppTO.getScopes().addAll(clientApp.getScopes());
         clientAppTO.setLogoutUri(clientApp.getLogoutUri());
         clientAppTO.setJwtAccessToken(clientApp.isJwtAccessToken());
         clientAppTO.setBypassApprovalPrompt(clientApp.isBypassApprovalPrompt());
@@ -268,7 +280,11 @@ public class ClientAppDataBinderImpl implements ClientAppDataBinder {
         clientApp.setName(clientAppTO.getName());
         clientApp.setClientAppId(clientAppTO.getClientAppId());
         clientApp.setDescription(clientAppTO.getDescription());
+        clientApp.setLogo(clientAppTO.getLogo());
         clientApp.setTheme(clientAppTO.getTheme());
+        clientApp.setInformationUrl(clientAppTO.getInformationUrl());
+        clientApp.setPrivacyUrl(clientAppTO.getPrivacyUrl());
+        clientApp.setUsernameAttributeProviderConf(clientAppTO.getUsernameAttributeProviderConf());
 
         if (clientAppTO.getAuthPolicy() == null) {
             clientApp.setAuthPolicy(null);
@@ -307,6 +323,20 @@ public class ClientAppDataBinderImpl implements ClientAppDataBinder {
             } else {
                 SyncopeClientException sce = SyncopeClientException.build(ClientExceptionType.InvalidPolicy);
                 sce.getElements().add("Expected " + AttrReleasePolicy.class.getSimpleName()
+                        + ", found " + policy.getClass().getSimpleName());
+                throw sce;
+            }
+        }
+
+        if (clientAppTO.getTicketExpirationPolicy() == null) {
+            clientApp.setTicketExpirationPolicy(null);
+        } else {
+            Policy policy = policyDAO.find(clientAppTO.getTicketExpirationPolicy());
+            if (policy instanceof TicketExpirationPolicy) {
+                clientApp.setTicketExpirationPolicy((TicketExpirationPolicy) policy);
+            } else {
+                SyncopeClientException sce = SyncopeClientException.build(ClientExceptionType.InvalidPolicy);
+                sce.getElements().add("Expected " + TicketExpirationPolicy.class.getSimpleName()
                         + ", found " + policy.getClass().getSimpleName());
                 throw sce;
             }

@@ -24,9 +24,9 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.ws.rs.PathParam;
 import java.util.ArrayList;
 import java.util.List;
-import javax.ws.rs.PathParam;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.syncope.common.lib.to.NamedEntityTO;
@@ -50,7 +50,7 @@ public abstract class PolicyTO implements NamedEntityTO {
 
     private final List<String> usedByRealms = new ArrayList<>();
 
-    @Schema(name = "_class", required = true)
+    @Schema(name = "_class", requiredMode = Schema.RequiredMode.REQUIRED)
     public abstract String getDiscriminator();
 
     public void setDiscriminator(final String discriminator) {

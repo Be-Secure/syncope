@@ -28,6 +28,7 @@ import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.syncope.common.lib.types.OIDCGrantType;
 import org.apache.syncope.common.lib.types.OIDCResponseType;
+import org.apache.syncope.common.lib.types.OIDCScope;
 import org.apache.syncope.common.lib.types.OIDCSubjectType;
 
 @Schema(allOf = { ClientAppTO.class })
@@ -51,13 +52,16 @@ public class OIDCRPClientAppTO extends ClientAppTO {
 
     private final List<OIDCResponseType> supportedResponseTypes = new ArrayList<>();
 
+    private final List<OIDCScope> scopes = new ArrayList<>();
+
     private String logoutUri;
 
     private boolean bypassApprovalPrompt = true;
 
     @JacksonXmlProperty(localName = "_class", isAttribute = true)
     @JsonProperty("_class")
-    @Schema(name = "_class", required = true, example = "org.apache.syncope.common.lib.to.client.OIDCRPTO")
+    @Schema(name = "_class", requiredMode = Schema.RequiredMode.REQUIRED,
+            example = "org.apache.syncope.common.lib.to.client.OIDCRPTO")
     @Override
     public String getDiscriminator() {
         return getClass().getName();
@@ -129,6 +133,12 @@ public class OIDCRPClientAppTO extends ClientAppTO {
         this.jwtAccessToken = jwtAccessToken;
     }
 
+    @JacksonXmlElementWrapper(localName = "scopes")
+    @JacksonXmlProperty(localName = "scope")
+    public List<OIDCScope> getScopes() {
+        return scopes;
+    }
+
     public boolean isBypassApprovalPrompt() {
         return bypassApprovalPrompt;
     }
@@ -160,6 +170,7 @@ public class OIDCRPClientAppTO extends ClientAppTO {
                 .append(this.supportedResponseTypes, rhs.supportedResponseTypes)
                 .append(this.logoutUri, rhs.logoutUri)
                 .append(this.jwtAccessToken, rhs.jwtAccessToken)
+                .append(this.scopes, rhs.scopes)
                 .append(this.bypassApprovalPrompt, rhs.bypassApprovalPrompt)
                 .isEquals();
     }
@@ -177,6 +188,7 @@ public class OIDCRPClientAppTO extends ClientAppTO {
                 .append(supportedResponseTypes)
                 .append(logoutUri)
                 .append(jwtAccessToken)
+                .append(scopes)
                 .append(bypassApprovalPrompt)
                 .toHashCode();
     }

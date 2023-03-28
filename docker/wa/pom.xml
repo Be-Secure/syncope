@@ -24,7 +24,7 @@ under the License.
   <parent>
     <groupId>org.apache.syncope</groupId>
     <artifactId>syncope-docker</artifactId>
-    <version>3.0.0-SNAPSHOT</version>
+    <version>4.0.0-SNAPSHOT</version>
   </parent>
 
   <name>Apache Syncope Docker WA</name>
@@ -32,6 +32,18 @@ under the License.
   <groupId>org.apache.syncope</groupId>
   <artifactId>syncope-docker-wa</artifactId>
   <packaging>war</packaging>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.apereo.cas</groupId>
+        <artifactId>cas-server-support-bom</artifactId>
+        <version>${cas.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <properties>
     <rootpom.basedir>${basedir}/../..</rootpom.basedir>
@@ -150,6 +162,7 @@ under the License.
         <directory>${basedir}/../../wa/starter/src/main/resources</directory>
         <filtering>true</filtering>
         <includes>
+          <include>cas-theme-default.properties</include>
           <include>wa.properties</include>
         </includes>
       </resource>

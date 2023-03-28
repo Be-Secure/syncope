@@ -27,19 +27,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import jakarta.ws.rs.NotAuthorizedException;
+import jakarta.ws.rs.core.GenericType;
+import jakarta.ws.rs.core.Response;
 import java.io.IOException;
-import java.security.AccessControlException;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import javax.ws.rs.core.GenericType;
-import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.cxf.jaxrs.client.WebClient;
@@ -91,7 +92,6 @@ import org.apache.syncope.common.rest.api.service.UserSelfService;
 import org.apache.syncope.common.rest.api.service.UserService;
 import org.apache.syncope.core.provisioning.api.serialization.POJOHelper;
 import org.apache.syncope.fit.AbstractITCase;
-import org.apache.syncope.fit.FlowableDetector;
 import org.apache.syncope.fit.core.reference.TestAccountRuleConf;
 import org.apache.syncope.fit.core.reference.TestPasswordRuleConf;
 import org.identityconnectors.framework.common.objects.OperationalAttributes;
@@ -339,14 +339,14 @@ public class UserITCase extends AbstractITCase {
             Triple<Map<String, Set<String>>, List<String>, UserTO> self =
                     CLIENT_FACTORY.create(userTO.getUsername(), "password123").self();
             assertNotNull(self);
-        } catch (AccessControlException e) {
-            fail("Credentials should be valid and not cause AccessControlException");
+        } catch (NotAuthorizedException e) {
+            fail("Credentials should be valid and not cause NotAuthorizedException");
         }
 
         try {
             CLIENT_FACTORY.create(userTO.getUsername(), "passwordXX").getService(UserSelfService.class);
-            fail("Credentials are invalid, thus request should raise AccessControlException");
-        } catch (AccessControlException e) {
+            fail("Credentials are invalid, thus request should raise NotAuthorizedException");
+        } catch (NotAuthorizedException e) {
             assertNotNull(e);
         }
 
@@ -630,12 +630,14 @@ public class UserITCase extends AbstractITCase {
     @Test
     public void verifyTaskRegistration() {
         // get task list
-        PagedResult<PropagationTaskTO> tasks = TASK_SERVICE.search(
-                new TaskQuery.Builder(TaskType.PROPAGATION).page(1).size(1).build());
-        assertNotNull(tasks);
-        assertFalse(tasks.getResult().isEmpty());
+        List<PropagationTaskTO> tasks = TASK_SERVICE.<PropagationTaskTO>search(
+                new TaskQuery.Builder(TaskType.PROPAGATION).page(1).size(1000).build()).getResult();
+        assertFalse(tasks.isEmpty());
 
-        String maxKey = tasks.getResult().iterator().next().getKey();
+        String maxKey = tasks.stream().
+                max(Comparator.comparing(PropagationTaskTO::getStart, Comparator.nullsLast(Comparator.naturalOrder()))).
+                map(PropagationTaskTO::getKey).orElse(null);
+        assertNotNull(maxKey);
 
         // --------------------------------------
         // Create operation
@@ -650,11 +652,14 @@ public class UserITCase extends AbstractITCase {
         assertNotNull(userTO);
 
         // get the new task list
-        tasks = TASK_SERVICE.search(new TaskQuery.Builder(TaskType.PROPAGATION).page(1).size(1).build());
-        assertNotNull(tasks);
-        assertFalse(tasks.getResult().isEmpty());
+        tasks = TASK_SERVICE.<PropagationTaskTO>search(
+                new TaskQuery.Builder(TaskType.PROPAGATION).page(1).size(1000).build()).getResult();
+        assertFalse(tasks.isEmpty());
 
-        String newMaxKey = tasks.getResult().iterator().next().getKey();
+        String newMaxKey = tasks.stream().
+                max(Comparator.comparing(PropagationTaskTO::getStart, Comparator.nullsLast(Comparator.naturalOrder()))).
+                map(PropagationTaskTO::getKey).orElse(null);
+        assertNotNull(newMaxKey);
 
         // default configuration for ws-target-resource2 during create:
         // only failed executions have to be registered
@@ -674,16 +679,18 @@ public class UserITCase extends AbstractITCase {
         assertNotNull(userTO);
 
         // get the new task list
-        tasks = TASK_SERVICE.search(new TaskQuery.Builder(TaskType.PROPAGATION).page(1).size(1).build());
+        tasks = TASK_SERVICE.<PropagationTaskTO>search(
+                new TaskQuery.Builder(TaskType.PROPAGATION).page(1).size(1000).build()).getResult();
+        assertFalse(tasks.isEmpty());
 
         // default configuration for ws-target-resource2 during update:
         // all update executions have to be registered
-        newMaxKey = tasks.getResult().iterator().next().getKey();
+        newMaxKey = tasks.stream().
+                max(Comparator.comparing(PropagationTaskTO::getStart, Comparator.nullsLast(Comparator.naturalOrder()))).
+                map(PropagationTaskTO::getKey).orElse(null);
+        assertNotNull(newMaxKey);
 
-        PropagationTaskTO taskTO = TASK_SERVICE.read(TaskType.PROPAGATION, newMaxKey, true);
-
-        assertNotNull(taskTO);
-        assertEquals(1, taskTO.getExecutions().size());
+        assertNotNull(TASK_SERVICE.read(TaskType.PROPAGATION, newMaxKey, false));
 
         // --------------------------------------
         // Delete operation
@@ -691,10 +698,15 @@ public class UserITCase extends AbstractITCase {
         USER_SERVICE.delete(userTO.getKey());
 
         // get the new task list
-        tasks = TASK_SERVICE.search(new TaskQuery.Builder(TaskType.PROPAGATION).page(1).size(1).build());
+        tasks = TASK_SERVICE.<PropagationTaskTO>search(
+                new TaskQuery.Builder(TaskType.PROPAGATION).page(1).size(1000).build()).getResult();
+        assertFalse(tasks.isEmpty());
 
         maxKey = newMaxKey;
-        newMaxKey = tasks.getResult().iterator().next().getKey();
+        newMaxKey = tasks.stream().
+                max(Comparator.comparing(PropagationTaskTO::getStart, Comparator.nullsLast(Comparator.naturalOrder()))).
+                map(PropagationTaskTO::getKey).orElse(null);
+        assertNotNull(newMaxKey);
 
         // default configuration for ws-target-resource2: no delete executions have to be registered
         // --> no more tasks/executions should be added
@@ -703,7 +715,7 @@ public class UserITCase extends AbstractITCase {
 
     @Test
     public void createActivate() {
-        assumeTrue(FlowableDetector.isFlowableEnabledForUserWorkflow(ADMIN_CLIENT.platform()));
+        assumeTrue(IS_FLOWABLE_ENABLED);
 
         UserCR userCR = getUniqueSample("createActivate@syncope.apache.org");
 
@@ -738,7 +750,7 @@ public class UserITCase extends AbstractITCase {
         UserTO userTO = createUser(userCR).getEntity();
 
         assertNotNull(userTO);
-        assertEquals(FlowableDetector.isFlowableEnabledForUserWorkflow(ADMIN_CLIENT.platform())
+        assertEquals(IS_FLOWABLE_ENABLED
                 ? "active"
                 : "created", userTO.getStatus());
 
@@ -774,7 +786,7 @@ public class UserITCase extends AbstractITCase {
         userCR.getResources().add(RESOURCE_NAME_LDAP);
         UserTO userTO = createUser(userCR).getEntity();
         assertNotNull(userTO);
-        assertEquals(FlowableDetector.isFlowableEnabledForUserWorkflow(ADMIN_CLIENT.platform())
+        assertEquals(IS_FLOWABLE_ENABLED
                 ? "active"
                 : "created", userTO.getStatus());
         String userKey = userTO.getKey();

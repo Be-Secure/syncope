@@ -18,6 +18,11 @@
  */
 package org.apache.syncope.core.persistence.jpa.dao;
 
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Query;
+import jakarta.persistence.TypedQuery;
 import java.lang.reflect.Field;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -25,11 +30,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import javax.persistence.ManyToOne;
-import javax.persistence.OneToMany;
-import javax.persistence.OneToOne;
-import javax.persistence.Query;
-import javax.persistence.TypedQuery;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.syncope.common.lib.to.PropagationTaskTO;
 import org.apache.syncope.common.lib.types.AnyTypeKind;
@@ -289,10 +289,12 @@ public class JPATaskDAO extends AbstractDAO<Task<?>> implements TaskDAO {
                     append(taskTable).
                     append(".notification_id=?").append(setParameter(parameters, notification.getKey()));
         }
-        if (anyTypeKind != null && entityKey != null) {
+        if (anyTypeKind != null) {
             queryString.append(" AND ").
-                    append(taskTable).append(".anyTypeKind=?").append(setParameter(parameters, anyTypeKind.name())).
-                    append(" AND ").
+                    append(taskTable).append(".anyTypeKind=?").append(setParameter(parameters, anyTypeKind.name()));
+        }
+        if (entityKey != null) {
+            queryString.append(" AND ").
                     append(taskTable).append(".entityKey=?").append(setParameter(parameters, entityKey));
         }
         if (type == TaskType.MACRO
@@ -473,6 +475,8 @@ public class JPATaskDAO extends AbstractDAO<Task<?>> implements TaskDAO {
     public <T extends Task<T>> T save(final T task) {
         if (task instanceof JPANotificationTask) {
             ((JPANotificationTask) task).list2json();
+        } else if (task instanceof JPAPushTask) {
+            ((JPAPushTask) task).map2json();
         }
         return entityManager().merge(task);
     }

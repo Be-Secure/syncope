@@ -22,10 +22,15 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import com.nimbusds.jose.JWSAlgorithm;
+import jakarta.ws.rs.core.GenericType;
+import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -33,6 +38,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
@@ -47,9 +53,6 @@ import javax.naming.directory.DirContext;
 import javax.naming.directory.InitialDirContext;
 import javax.naming.directory.ModificationItem;
 import javax.sql.DataSource;
-import javax.ws.rs.core.GenericType;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.cxf.jaxrs.client.WebClient;
@@ -70,7 +73,9 @@ import org.apache.syncope.common.lib.policy.AuthPolicyTO;
 import org.apache.syncope.common.lib.policy.DefaultAccessPolicyConf;
 import org.apache.syncope.common.lib.policy.DefaultAttrReleasePolicyConf;
 import org.apache.syncope.common.lib.policy.DefaultAuthPolicyConf;
+import org.apache.syncope.common.lib.policy.DefaultTicketExpirationPolicyConf;
 import org.apache.syncope.common.lib.policy.PolicyTO;
+import org.apache.syncope.common.lib.policy.TicketExpirationPolicyTO;
 import org.apache.syncope.common.lib.request.AnyObjectCR;
 import org.apache.syncope.common.lib.request.AnyObjectUR;
 import org.apache.syncope.common.lib.request.AttrPatch;
@@ -86,6 +91,7 @@ import org.apache.syncope.common.lib.to.MembershipTO;
 import org.apache.syncope.common.lib.to.NotificationTO;
 import org.apache.syncope.common.lib.to.OIDCRPClientAppTO;
 import org.apache.syncope.common.lib.to.ProvisioningResult;
+import org.apache.syncope.common.lib.to.RealmTO;
 import org.apache.syncope.common.lib.to.ReportTO;
 import org.apache.syncope.common.lib.to.ResourceTO;
 import org.apache.syncope.common.lib.to.RoleTO;
@@ -133,7 +139,6 @@ import org.apache.syncope.common.rest.api.service.ReconciliationService;
 import org.apache.syncope.common.rest.api.service.RelationshipTypeService;
 import org.apache.syncope.common.rest.api.service.RemediationService;
 import org.apache.syncope.common.rest.api.service.ReportService;
-import org.apache.syncope.common.rest.api.service.ReportTemplateService;
 import org.apache.syncope.common.rest.api.service.ResourceService;
 import org.apache.syncope.common.rest.api.service.RoleService;
 import org.apache.syncope.common.rest.api.service.SAML2IdPEntityService;
@@ -319,8 +324,6 @@ public abstract class AbstractITCase {
 
     protected static AuditService AUDIT_SERVICE;
 
-    protected static ReportTemplateService REPORT_TEMPLATE_SERVICE;
-
     protected static ReportService REPORT_SERVICE;
 
     protected static TaskService TASK_SERVICE;
@@ -385,6 +388,10 @@ public abstract class AbstractITCase {
 
     protected static ImpersonationService IMPERSONATION_SERVICE;
 
+    protected static boolean IS_FLOWABLE_ENABLED = false;
+
+    protected static boolean IS_ELASTICSEARCH_ENABLED = false;
+
     @BeforeAll
     public static void securitySetup() {
         try (InputStream propStream = AbstractITCase.class.getResourceAsStream("/core.properties")) {
@@ -443,7 +450,6 @@ public abstract class AbstractITCase {
         RESOURCE_SERVICE = ADMIN_CLIENT.getService(ResourceService.class);
         CONNECTOR_SERVICE = ADMIN_CLIENT.getService(ConnectorService.class);
         AUDIT_SERVICE = ADMIN_CLIENT.getService(AuditService.class);
-        REPORT_TEMPLATE_SERVICE = ADMIN_CLIENT.getService(ReportTemplateService.class);
         REPORT_SERVICE = ADMIN_CLIENT.getService(ReportService.class);
         TASK_SERVICE = ADMIN_CLIENT.getService(TaskService.class);
         RECONCILIATION_SERVICE = ADMIN_CLIENT.getService(ReconciliationService.class);
@@ -471,6 +477,19 @@ public abstract class AbstractITCase {
         AUTH_PROFILE_SERVICE = ADMIN_CLIENT.getService(AuthProfileService.class);
         OIDC_JWKS_SERVICE = ADMIN_CLIENT.getService(OIDCJWKSService.class);
         WA_CONFIG_SERVICE = ADMIN_CLIENT.getService(WAConfigService.class);
+    }
+
+    @BeforeAll
+    public static void actuatorInfoSetup() throws IOException {
+        JsonNode beans = JSON_MAPPER.readTree(
+                (InputStream) WebClient.create(StringUtils.substringBeforeLast(ADDRESS, "/") + "/actuator/beans").
+                        accept(MediaType.APPLICATION_JSON).get().getEntity());
+
+        JsonNode uwfAdapter = beans.findValues("uwfAdapter").get(0);
+        IS_FLOWABLE_ENABLED = uwfAdapter.get("resource").asText().contains("Flowable");
+
+        JsonNode anySearchDAO = beans.findValues("anySearchDAO").get(0);
+        IS_ELASTICSEARCH_ENABLED = anySearchDAO.get("type").asText().contains("Elasticsearch");
     }
 
     protected static String getUUIDString() {
@@ -922,6 +941,8 @@ public abstract class AbstractITCase {
         policy.setStatus(Boolean.TRUE);
 
         DefaultAttrReleasePolicyConf conf = new DefaultAttrReleasePolicyConf();
+        conf.getReleaseAttrs().put("uid", "username");
+        conf.getReleaseAttrs().put("cn", "fullname");
         conf.getAllowedAttrs().addAll(List.of("cn", "givenName"));
         conf.getIncludeOnlyAttrs().add("cn");
 
@@ -933,16 +954,41 @@ public abstract class AbstractITCase {
     protected static AccessPolicyTO buildAccessPolicyTO() {
         AccessPolicyTO policy = new AccessPolicyTO();
         policy.setName("Test Access policy");
-        policy.setEnabled(true);
 
         DefaultAccessPolicyConf conf = new DefaultAccessPolicyConf();
-        conf.getRequiredAttrs().add(new Attr.Builder("cn").values("admin", "Admin", "TheAdmin").build());
+        conf.setEnabled(true);
+        conf.getRequiredAttrs().put("cn", "admin,Admin,TheAdmin");
+        policy.setConf(conf);
+
+        return policy;
+    }
+
+    protected static TicketExpirationPolicyTO buildTicketExpirationPolicyTO() {
+        TicketExpirationPolicyTO policy = new TicketExpirationPolicyTO();
+        policy.setName("Test Ticket Expiration policy");
+
+        DefaultTicketExpirationPolicyConf conf = new DefaultTicketExpirationPolicyConf();
+        DefaultTicketExpirationPolicyConf.TGTConf tgtConf = new DefaultTicketExpirationPolicyConf.TGTConf();
+        tgtConf.setMaxTimeToLiveInSeconds(110);
+        conf.setTgtConf(tgtConf);
+        DefaultTicketExpirationPolicyConf.STConf stConf = new DefaultTicketExpirationPolicyConf.STConf();
+        stConf.setMaxTimeToLiveInSeconds(0);
+        stConf.setNumberOfUses(1);
+        conf.setStConf(stConf);
         policy.setConf(conf);
 
         return policy;
     }
 
     protected static List<AuditEntry> query(final AuditQuery query, final int maxWaitSeconds) {
+        if (IS_ELASTICSEARCH_ENABLED) {
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException ex) {
+                // ignore
+            }
+        }
+
         int i = 0;
         List<AuditEntry> results = List.of();
         do {
@@ -954,6 +1000,10 @@ public abstract class AbstractITCase {
             i++;
         } while (results.isEmpty() && i < maxWaitSeconds);
         return results;
+    }
+
+    protected static Optional<RealmTO> getRealm(final String fullPath) {
+        return REALM_SERVICE.list(fullPath).stream().filter(realm -> fullPath.equals(realm.getFullPath())).findFirst();
     }
 
     @Autowired

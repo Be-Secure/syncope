@@ -25,10 +25,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import jakarta.ws.rs.core.Response;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import javax.ws.rs.core.Response;
 import org.apache.syncope.client.lib.SyncopeClient;
 import org.apache.syncope.common.lib.SyncopeConstants;
 import org.apache.syncope.common.lib.request.GroupCR;
@@ -53,8 +53,10 @@ import org.apache.syncope.common.lib.types.MappingPurpose;
 import org.apache.syncope.common.lib.types.MatchingRule;
 import org.apache.syncope.common.lib.types.SchemaType;
 import org.apache.syncope.common.lib.types.TaskType;
+import org.apache.syncope.common.lib.types.ThreadPoolSettings;
 import org.apache.syncope.common.lib.types.TraceLevel;
 import org.apache.syncope.common.lib.types.UnmatchingRule;
+import org.apache.syncope.common.rest.api.RESTHeaders;
 import org.apache.syncope.common.rest.api.beans.ReconQuery;
 import org.apache.syncope.common.rest.api.beans.TaskQuery;
 import org.apache.syncope.common.rest.api.service.NotificationService;
@@ -93,7 +95,7 @@ public class PushTaskITCase extends AbstractTaskITCase {
     @Test
     public void createPushTask() {
         PushTaskTO task = new PushTaskTO();
-        task.setName("Test create Push");
+        task.setName(getUUIDString());
         task.setResource(RESOURCE_NAME_WS2);
         task.setSourceRealm(SyncopeConstants.ROOT_REALM);
         task.getFilters().put(AnyTypeKind.USER.name(),
@@ -350,6 +352,32 @@ public class PushTaskITCase extends AbstractTaskITCase {
         assertNotNull(getLdapRemoteObject(RESOURCE_LDAP_ADMIN_DN, RESOURCE_LDAP_ADMIN_PWD, "ou=odd,o=isp"));
         assertNotNull(getLdapRemoteObject(RESOURCE_LDAP_ADMIN_DN, RESOURCE_LDAP_ADMIN_PWD, "ou=even,o=isp"));
         assertNotNull(getLdapRemoteObject(RESOURCE_LDAP_ADMIN_DN, RESOURCE_LDAP_ADMIN_PWD, "ou=two,ou=even,o=isp"));
+    }
+
+    @Test
+    public void concurrentPush() {
+        // 1. create new concurrent pull task
+        PushTaskTO pushTask = TASK_SERVICE.read(TaskType.PUSH, "97f327b6-2eff-4d35-85e8-d581baaab855", false);
+        assertNull(pushTask.getConcurrentSettings());
+        pushTask.setKey(null);
+        pushTask.setName("Concurrent Export on resource-testdb2");
+        pushTask.setDescription("Concurrent Export on resource-testdb2");
+        pushTask.getFilters().put(AnyTypeKind.USER.name(), "username!=puccini;username!=vivaldi");
+
+        ThreadPoolSettings tps = new ThreadPoolSettings();
+        tps.setCorePoolSize(3);
+        tps.setMaxPoolSize(3);
+        tps.setQueueCapacity(100);
+        pushTask.setConcurrentSettings(tps);
+
+        Response response = TASK_SERVICE.create(TaskType.PUSH, pushTask);
+        String pushTaskKey = response.getHeaderString(RESTHeaders.RESOURCE_KEY);
+
+        // 2. run concurrent pull task
+        ExecTO execution = execProvisioningTask(TASK_SERVICE, TaskType.PUSH, pushTaskKey, MAX_WAIT_SECONDS, false);
+
+        // 3. verify execution status
+        assertEquals(ExecStatus.SUCCESS, ExecStatus.valueOf(execution.getStatus()));
     }
 
     @Test

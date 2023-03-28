@@ -18,12 +18,12 @@
  */
 package org.apache.syncope.core.persistence.jpa.dao;
 
+import jakarta.persistence.Query;
+import jakarta.persistence.TypedQuery;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
-import javax.persistence.Query;
-import javax.persistence.TypedQuery;
 import org.apache.syncope.core.persistence.api.dao.ExternalResourceDAO;
 import org.apache.syncope.core.persistence.api.dao.VirSchemaDAO;
 import org.apache.syncope.core.persistence.api.entity.AnyTypeClass;
@@ -104,8 +104,9 @@ public class JPAVirSchemaDAO extends AbstractDAO<VirSchema> implements VirSchema
     }
 
     @Override
-    public VirSchema save(final VirSchema virSchema) {
-        return entityManager().merge(virSchema);
+    public VirSchema save(final VirSchema schema) {
+        ((JPAVirSchema) schema).map2json();
+        return entityManager().merge(schema);
     }
 
     @Override
@@ -114,8 +115,6 @@ public class JPAVirSchemaDAO extends AbstractDAO<VirSchema> implements VirSchema
         if (schema == null) {
             return;
         }
-
-        schema.getLabels().forEach(label -> label.setSchema(null));
 
         resourceDAO.deleteMapping(key);
 

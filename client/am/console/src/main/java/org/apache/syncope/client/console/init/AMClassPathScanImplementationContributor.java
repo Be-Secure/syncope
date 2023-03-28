@@ -21,15 +21,25 @@ package org.apache.syncope.client.console.init;
 import java.util.Optional;
 import org.apache.syncope.common.lib.attr.AttrRepoConf;
 import org.apache.syncope.common.lib.auth.AuthModuleConf;
+import org.apache.syncope.common.lib.clientapps.UsernameAttributeProviderConf;
+import org.apache.syncope.common.lib.policy.AccessPolicyConf;
+import org.apache.syncope.common.lib.policy.AttrReleasePolicyConf;
+import org.apache.syncope.common.lib.policy.AuthPolicyConf;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.type.filter.AssignableTypeFilter;
 
 public class AMClassPathScanImplementationContributor implements ClassPathScanImplementationContributor {
 
+    private static final long serialVersionUID = 2493303413513242525L;
+
     @Override
     public void extend(final ClassPathScanningCandidateComponentProvider scanner) {
         scanner.addIncludeFilter(new AssignableTypeFilter(AuthModuleConf.class));
         scanner.addIncludeFilter(new AssignableTypeFilter(AttrRepoConf.class));
+        scanner.addIncludeFilter(new AssignableTypeFilter(AccessPolicyConf.class));
+        scanner.addIncludeFilter(new AssignableTypeFilter(AttrReleasePolicyConf.class));
+        scanner.addIncludeFilter(new AssignableTypeFilter(AuthPolicyConf.class));
+        scanner.addIncludeFilter(new AssignableTypeFilter(UsernameAttributeProviderConf.class));
     }
 
     @Override
@@ -39,6 +49,18 @@ public class AMClassPathScanImplementationContributor implements ClassPathScanIm
         }
         if (AttrRepoConf.class.isAssignableFrom(clazz)) {
             return Optional.of(AttrRepoConf.class.getName());
+        }
+        if (AccessPolicyConf.class.isAssignableFrom(clazz)) {
+            return Optional.of(AccessPolicyConf.class.getName());
+        }
+        if (AttrReleasePolicyConf.class.isAssignableFrom(clazz)) {
+            return Optional.of(AttrReleasePolicyConf.class.getName());
+        }
+        if (AuthPolicyConf.class.isAssignableFrom(clazz)) {
+            return Optional.of(AuthPolicyConf.class.getName());
+        }
+        if (UsernameAttributeProviderConf.class.isAssignableFrom(clazz)) {
+            return Optional.of(UsernameAttributeProviderConf.class.getName());
         }
         return Optional.empty();
     }

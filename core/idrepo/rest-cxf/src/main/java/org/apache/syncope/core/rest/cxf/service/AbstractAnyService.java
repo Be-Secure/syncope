@@ -18,13 +18,13 @@
  */
 package org.apache.syncope.core.rest.cxf.service;
 
+import jakarta.ws.rs.BadRequestException;
+import jakarta.ws.rs.core.Response;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import javax.ws.rs.BadRequestException;
-import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -36,7 +36,6 @@ import org.apache.syncope.common.lib.request.AnyUR;
 import org.apache.syncope.common.lib.request.AttrPatch;
 import org.apache.syncope.common.lib.request.ResourceAR;
 import org.apache.syncope.common.lib.request.ResourceDR;
-import org.apache.syncope.common.lib.search.SpecialAttr;
 import org.apache.syncope.common.lib.to.AnyTO;
 import org.apache.syncope.common.lib.to.PagedResult;
 import org.apache.syncope.common.lib.to.ProvisioningResult;
@@ -112,11 +111,8 @@ public abstract class AbstractAnyService<TO extends AnyTO, CR extends AnyCR, UR 
                 result = any.getPlainAttr(schema);
         }
 
-        if (result.isEmpty()) {
-            throw new NotFoundException("Attribute for type " + schemaType + " and schema " + schema);
-        }
-
-        return result.get();
+        return result.
+                orElseThrow(() -> new NotFoundException("Attribute for type " + schemaType + " and schema " + schema));
     }
 
     @Override
@@ -128,11 +124,6 @@ public abstract class AbstractAnyService<TO extends AnyTO, CR extends AnyCR, UR 
     public PagedResult<TO> search(final AnyQuery anyQuery) {
         String realm = StringUtils.prependIfMissing(anyQuery.getRealm(), SyncopeConstants.ROOT_REALM);
 
-        // if an assignable query is provided in the FIQL string, start anyway from root realm
-        boolean isAssignableCond = StringUtils.isBlank(anyQuery.getFiql())
-                ? false
-                : -1 != anyQuery.getFiql().indexOf(SpecialAttr.ASSIGNABLE.toString());
-
         SearchCond searchCond = StringUtils.isBlank(anyQuery.getFiql())
                 ? null
                 : getSearchCond(anyQuery.getFiql(), realm);
@@ -143,7 +134,7 @@ public abstract class AbstractAnyService<TO extends AnyTO, CR extends AnyCR, UR 
                     anyQuery.getPage(),
                     anyQuery.getSize(),
                     getOrderByClauses(anyQuery.getOrderBy()),
-                    isAssignableCond ? SyncopeConstants.ROOT_REALM : realm,
+                    realm,
                     anyQuery.getRecursive(),
                     anyQuery.getDetails());
 

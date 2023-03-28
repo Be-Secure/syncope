@@ -27,6 +27,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
+import jakarta.ws.rs.core.GenericType;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -37,9 +40,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import javax.naming.NamingException;
-import javax.ws.rs.core.GenericType;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.cxf.helpers.IOUtils;
 import org.apache.cxf.jaxrs.client.WebClient;
@@ -85,7 +85,6 @@ import org.apache.syncope.core.provisioning.java.propagation.DBPasswordPropagati
 import org.apache.syncope.core.provisioning.java.propagation.LDAPPasswordPropagationActions;
 import org.apache.syncope.core.spring.security.Encryptor;
 import org.apache.syncope.fit.AbstractITCase;
-import org.apache.syncope.fit.ElasticsearchDetector;
 import org.identityconnectors.framework.common.objects.Name;
 import org.identityconnectors.framework.common.objects.OperationalAttributes;
 import org.junit.jupiter.api.Test;
@@ -1066,7 +1065,7 @@ public class UserIssuesITCase extends AbstractITCase {
 
     @Test
     public void issueSYNCOPE391() {
-        assumeFalse(ElasticsearchDetector.isElasticSearchEnabled(ADMIN_CLIENT.platform()));
+        assumeFalse(IS_ELASTICSEARCH_ENABLED);
 
         // 1. create user on Syncope with null password
         UserCR userCR = UserITCase.getUniqueSample("syncope391@syncope.apache.org");

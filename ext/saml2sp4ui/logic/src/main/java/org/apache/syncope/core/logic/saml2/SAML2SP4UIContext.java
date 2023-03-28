@@ -18,11 +18,11 @@
  */
 package org.apache.syncope.core.logic.saml2;
 
+import jakarta.ws.rs.HttpMethod;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import javax.ws.rs.HttpMethod;
 import org.apache.syncope.common.lib.saml2.SAML2Constants;
 import org.apache.syncope.common.lib.saml2.SAML2Response;
 import org.apache.syncope.common.lib.types.SAML2BindingType;
@@ -49,16 +49,14 @@ public class SAML2SP4UIContext implements WebContext {
 
     @Override
     public Optional<String> getRequestParameter(final String name) {
-        switch (name) {
-            case SAML2Constants.SAML_RESPONSE:
-                return Optional.ofNullable(saml2Response.getSamlResponse());
-
-            case SAML2Constants.RELAY_STATE:
-                return Optional.ofNullable(saml2Response.getRelayState());
-
-            default:
-                return Optional.empty();
-        }
+        return switch (name) {
+            case SAML2Constants.SAML_RESPONSE ->
+                Optional.ofNullable(saml2Response.getSamlResponse());
+            case SAML2Constants.RELAY_STATE ->
+                Optional.ofNullable(saml2Response.getRelayState());
+            default ->
+                Optional.empty();
+        };
     }
 
     @Override

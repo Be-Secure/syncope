@@ -18,6 +18,9 @@
  */
 package org.apache.syncope.fit.sra;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.oneOf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -29,6 +32,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import jakarta.ws.rs.core.Form;
+import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
@@ -38,10 +45,6 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
-import javax.ws.rs.core.Form;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import org.apache.cxf.jaxrs.client.WebClient;
 import org.apache.http.Consts;
 import org.apache.http.HttpStatus;
@@ -113,9 +116,10 @@ public class OIDCSRAITCase extends AbstractSRAITCase {
         clientApp.setSubjectType(OIDCSubjectType.PUBLIC);
         clientApp.getRedirectUris().clear();
         clientApp.getRedirectUris().add(SRA_ADDRESS + "/login/oauth2/code/" + sraRegistrationId);
-        clientApp.setAuthPolicy(getAuthPolicy().getKey());
         clientApp.setSignIdToken(true);
         clientApp.setLogoutUri(SRA_ADDRESS + "/logout");
+        clientApp.setAuthPolicy(getAuthPolicy().getKey());
+        clientApp.setAttrReleasePolicy(getAttrReleasePolicy().getKey());
 
         CLIENT_APP_SERVICE.update(ClientAppType.OIDCRP, clientApp);
         CLIENT_APP_SERVICE.pushToWA();
@@ -271,8 +275,10 @@ public class OIDCSRAITCase extends AbstractSRAITCase {
         ObjectNode headers = (ObjectNode) json.get("headers");
         assertEquals(MediaType.APPLICATION_JSON, headers.get(HttpHeaders.ACCEPT).asText());
         assertEquals(MediaType.APPLICATION_JSON, headers.get(HttpHeaders.CONTENT_TYPE).asText());
-        assertEquals("localhost:" + PORT, headers.get("X-Forwarded-Host").asText());
+        assertThat(headers.get("X-Forwarded-Host").asText(), is(oneOf("localhost:8080", "127.0.0.1:8080")));
 
-        assertEquals(client.getBaseURI().toASCIIString().replace("/protected", ""), json.get("url").asText());
+        String withHost = client.getBaseURI().toASCIIString().replace("/protected", "");
+        String withIP = withHost.replace("localhost", "127.0.0.1");
+        assertThat(json.get("url").asText(), is(oneOf(withHost, withIP)));
     }
 }

@@ -172,7 +172,7 @@ public class AuthModuleTest extends AbstractTest {
         conf.setSearchFilter("cn={user}");
         conf.setSubtreeSearch(true);
         conf.setLdapUrl("ldap://localhost:1389");
-        conf.setUserIdAttribute("uid");
+        conf.setPrincipalAttributeId("uid");
         conf.setBindCredential("Password");
 
         saveAuthModule("LDAPAuthModuleTest", conf);
@@ -217,7 +217,6 @@ public class AuthModuleTest extends AbstractTest {
         JDBCAuthModuleConf conf = new JDBCAuthModuleConf();
         conf.setSql("SELECT * FROM table WHERE name=?");
         conf.setFieldPassword("password");
-        conf.getPrincipalAttributeList().addAll(List.of("sn", "cn:commonName", "givenName"));
 
         saveAuthModule("JDBCAuthModuleTest", conf);
     }

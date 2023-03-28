@@ -20,9 +20,9 @@ package org.apache.syncope.common.lib.to;
 
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
+import jakarta.ws.rs.PathParam;
 import java.util.ArrayList;
 import java.util.List;
-import javax.ws.rs.PathParam;
 
 public class OIDCC4UIProviderTO extends ItemContainer implements EntityTO {
 
@@ -50,13 +50,13 @@ public class OIDCC4UIProviderTO extends ItemContainer implements EntityTO {
 
     private boolean hasDiscovery;
 
-    private UserTO userTemplate;
-
     private boolean createUnmatching;
 
     private boolean updateMatching;
 
     private boolean selfRegUnmatching;
+
+    private UserTO userTemplate;
 
     private final List<String> actions = new ArrayList<>();
 

@@ -27,6 +27,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import jakarta.ws.rs.core.GenericType;
+import jakarta.ws.rs.core.Response;
+import jakarta.xml.ws.WebServiceException;
 import java.io.IOException;
 import java.text.ParseException;
 import java.time.LocalDate;
@@ -40,9 +43,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import javax.ws.rs.core.GenericType;
-import javax.ws.rs.core.Response;
-import javax.xml.ws.WebServiceException;
 import org.apache.commons.lang3.SerializationUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.syncope.client.lib.SyncopeClient;
@@ -91,7 +91,7 @@ import org.apache.syncope.common.lib.types.ResourceOperation;
 import org.apache.syncope.common.lib.types.SchemaType;
 import org.apache.syncope.common.lib.types.TaskType;
 import org.apache.syncope.common.rest.api.RESTHeaders;
-import org.apache.syncope.common.rest.api.beans.ExecListQuery;
+import org.apache.syncope.common.rest.api.beans.ExecQuery;
 import org.apache.syncope.common.rest.api.beans.ExecSpecs;
 import org.apache.syncope.common.rest.api.beans.ReconQuery;
 import org.apache.syncope.common.rest.api.beans.TaskQuery;
@@ -605,8 +605,9 @@ public class PropagationTaskITCase extends AbstractTaskITCase {
         assertFalse(task.getExecutions().isEmpty());
 
         // check list executions
-        PagedResult<ExecTO> execs = TASK_SERVICE.listExecutions(new ExecListQuery.Builder().key(
-                "1e697572-b896-484c-ae7f-0c8f63fcbc6c").
+        PagedResult<ExecTO> execs = TASK_SERVICE.listExecutions(new ExecQuery.Builder().
+                key("1e697572-b896-484c-ae7f-0c8f63fcbc6c").
+                before(OffsetDateTime.now().plusSeconds(30)).
                 page(1).size(2).build());
         assertTrue(execs.getTotalCount() >= execs.getResult().size());
     }
@@ -896,8 +897,8 @@ public class PropagationTaskITCase extends AbstractTaskITCase {
 
             // 1. create user with relationship and the new resource assigned
             UserCR userCR = UserITCase.getUniqueSample("syncope1567@syncope.apache.org");
-            userCR.getRelationships().add(new RelationshipTO.Builder().
-                    type("neighborhood").otherEnd(PRINTER, "fc6dbc3a-6c07-4965-8781-921e7401a4a5").build());
+            userCR.getRelationships().add(new RelationshipTO.Builder("neighborhood").
+                    otherEnd(PRINTER, "fc6dbc3a-6c07-4965-8781-921e7401a4a5").build());
             userCR.getResources().clear();
             userCR.getResources().add(ldap.getKey());
 

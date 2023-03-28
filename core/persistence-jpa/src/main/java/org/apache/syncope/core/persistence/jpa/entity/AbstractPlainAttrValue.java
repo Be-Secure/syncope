@@ -18,12 +18,12 @@
  */
 package org.apache.syncope.core.persistence.jpa.entity;
 
+import jakarta.persistence.Lob;
+import jakarta.persistence.MappedSuperclass;
 import java.time.OffsetDateTime;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.regex.Pattern;
-import javax.persistence.Lob;
-import javax.persistence.MappedSuperclass;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -140,7 +140,7 @@ public abstract class AbstractPlainAttrValue extends AbstractGeneratedKeyEntity 
         switch (schema.getType()) {
 
             case Boolean:
-                this.setBooleanValue(Boolean.parseBoolean(value));
+                this.setBooleanValue(Boolean.valueOf(value));
                 break;
 
             case Long:

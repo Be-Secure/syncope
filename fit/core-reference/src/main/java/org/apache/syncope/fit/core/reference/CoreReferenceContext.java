@@ -18,13 +18,15 @@
  */
 package org.apache.syncope.fit.core.reference;
 
+import org.apache.syncope.common.lib.SyncopeConstants;
 import org.apache.syncope.core.logic.IdRepoLogicContext;
 import org.apache.syncope.core.logic.TaskLogic;
-import org.apache.syncope.core.persistence.api.ImplementationLookup;
+import org.apache.syncope.core.logic.audit.AuditAppender;
 import org.apache.syncope.core.persistence.api.dao.AnySearchDAO;
 import org.apache.syncope.core.persistence.api.dao.ImplementationDAO;
 import org.apache.syncope.core.persistence.api.dao.UserDAO;
 import org.apache.syncope.core.persistence.api.entity.EntityFactory;
+import org.apache.syncope.core.provisioning.api.ImplementationLookup;
 import org.apache.syncope.core.workflow.api.UserWorkflowAdapter;
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.context.annotation.Bean;
@@ -58,5 +60,15 @@ public class CoreReferenceContext {
             final ElasticsearchInit elasticsearchInit) {
 
         return new ITImplementationLookup(uwf, anySearchDAO, enableFlowableForTestUsers, elasticsearchInit);
+    }
+
+    @Bean
+    public AuditAppender testFileAuditAppender() {
+        return new TestFileAuditAppender(SyncopeConstants.MASTER_DOMAIN);
+    }
+
+    @Bean
+    public AuditAppender testFileRewriteAuditAppender() {
+        return new TestFileRewriteAuditAppender(SyncopeConstants.MASTER_DOMAIN);
     }
 }

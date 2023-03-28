@@ -18,10 +18,11 @@
  */
 package org.apache.syncope.core.persistence.jpa.dao;
 
+import jakarta.persistence.Query;
+import jakarta.persistence.TypedQuery;
 import java.lang.reflect.Field;
+import java.time.OffsetDateTime;
 import java.util.List;
-import javax.persistence.Query;
-import javax.persistence.TypedQuery;
 import org.apache.syncope.core.persistence.api.dao.RemediationDAO;
 import org.apache.syncope.core.persistence.api.dao.search.OrderByClause;
 import org.apache.syncope.core.persistence.api.entity.AnyType;
@@ -57,20 +58,47 @@ public class JPARemediationDAO extends AbstractDAO<Remediation> implements Remed
         return query.getResultList();
     }
 
+    protected StringBuilder query(
+            final StringBuilder select,
+            final OffsetDateTime before,
+            final OffsetDateTime after) {
+
+        StringBuilder query = select.
+                append(JPARemediation.class.getSimpleName()).
+                append(" e WHERE 1=1 ");
+        if (before != null) {
+            query.append("AND e.instant <= :before ");
+        }
+        if (after != null) {
+            query.append("AND e.instant >= :after ");
+        }
+        return query;
+    }
+
     @Override
-    public int count() {
-        Query query = entityManager().createNativeQuery("SELECT COUNT(id) FROM " + JPARemediation.TABLE);
+    public int count(final OffsetDateTime before, final OffsetDateTime after) {
+        StringBuilder queryString = query(new StringBuilder("SELECT COUNT(e) FROM "), before, after);
+
+        Query query = entityManager().createQuery(queryString.toString());
+        if (before != null) {
+            query.setParameter("before", before);
+        }
+        if (after != null) {
+            query.setParameter("after", after);
+        }
+
         return ((Number) query.getSingleResult()).intValue();
     }
 
     @Override
     public List<Remediation> findAll(
+            final OffsetDateTime before,
+            final OffsetDateTime after,
             final int page,
             final int itemsPerPage,
             final List<OrderByClause> orderByClauses) {
 
-        StringBuilder queryString = new StringBuilder(
-                "SELECT e FROM " + JPARemediation.class.getSimpleName() + " e");
+        StringBuilder queryString = query(new StringBuilder("SELECT e FROM "), before, after);
 
         if (!orderByClauses.isEmpty()) {
             queryString.append(" ORDER BY ");
@@ -102,7 +130,12 @@ public class JPARemediationDAO extends AbstractDAO<Remediation> implements Remed
         }
 
         TypedQuery<Remediation> query = entityManager().createQuery(queryString.toString(), Remediation.class);
-
+        if (before != null) {
+            query.setParameter("before", before);
+        }
+        if (after != null) {
+            query.setParameter("after", after);
+        }
         query.setFirstResult(itemsPerPage * (page <= 0 ? 0 : page - 1));
 
         if (itemsPerPage > 0) {

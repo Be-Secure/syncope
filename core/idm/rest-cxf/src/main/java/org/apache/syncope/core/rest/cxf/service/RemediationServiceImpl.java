@@ -18,9 +18,9 @@
  */
 package org.apache.syncope.core.rest.cxf.service;
 
+import jakarta.ws.rs.core.Response;
 import java.time.OffsetDateTime;
 import java.util.List;
-import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.syncope.common.lib.request.AnyCR;
 import org.apache.syncope.common.lib.request.AnyUR;
@@ -63,7 +63,11 @@ public class RemediationServiceImpl extends AbstractService implements Remediati
     @Override
     public PagedResult<RemediationTO> list(final RemediationQuery query) {
         Pair<Integer, List<RemediationTO>> result = logic.list(
-                query.getPage(), query.getSize(), getOrderByClauses(query.getOrderBy()));
+                query.getBefore(),
+                query.getAfter(),
+                query.getPage(),
+                query.getSize(),
+                getOrderByClauses(query.getOrderBy()));
         return buildPagedResult(result.getRight(), query.getPage(), query.getSize(), result.getLeft());
     }
 

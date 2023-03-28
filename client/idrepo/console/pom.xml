@@ -24,7 +24,7 @@ under the License.
   <parent>
     <groupId>org.apache.syncope.client</groupId>
     <artifactId>syncope-client-idrepo</artifactId>
-    <version>3.0.0-SNAPSHOT</version>
+    <version>4.0.0-SNAPSHOT</version>
   </parent>
 
   <name>Apache Syncope Client IdRepo Console</name>
@@ -124,7 +124,7 @@ under the License.
     </dependency>
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
-      <artifactId>log4j-slf4j-impl</artifactId>
+      <artifactId>log4j-slf4j2-impl</artifactId>
     </dependency>
     <dependency>
       <groupId>com.lmax</groupId>
@@ -146,29 +146,23 @@ under the License.
   <build>
     <plugins>
       <plugin>
-        <groupId>nl.geodienstencentrum.maven</groupId>
-        <artifactId>sass-maven-plugin</artifactId>
+        <groupId>us.hebi.sass</groupId>
+        <artifactId>sass-cli-maven-plugin</artifactId>
         <inherited>true</inherited>
+        <configuration>
+          <args>
+            <arg>${basedir}/src/main/resources/META-INF/resources/css:${project.build.outputDirectory}/META-INF/resources/css</arg>
+          </args>
+        </configuration>
         <executions>
           <execution>
             <id>sass-compilation</id>
-            <phase>compile</phase>
+            <phase>generate-resources</phase>
             <goals>
-              <goal>update-stylesheets</goal>
+              <goal>run</goal>
             </goals>
           </execution>
         </executions>
-        <configuration>
-          <resources>
-            <resource>
-              <source>
-                <directory>${basedir}/src/main/resources/META-INF/resources/css</directory>
-              </source>
-              <destination>${project.build.outputDirectory}/META-INF/resources/css</destination>
-            </resource>
-          </resources>
-          <skip>${sass.skip}</skip>
-        </configuration>
       </plugin>
 
       <plugin>
@@ -194,8 +188,13 @@ under the License.
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
       </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+      </plugin>
     </plugins>
-    
+
     <resources>
       <resource>
         <directory>src/main/resources</directory>
@@ -264,13 +263,39 @@ under the License.
       <id>debug</id>
 
       <properties>
+        <maven.build.cache.skipCache>true</maven.build.cache.skipCache>
         <skipTests>true</skipTests>
       </properties>
 
       <build>
-        <defaultGoal>clean package spring-boot:run</defaultGoal>
+        <defaultGoal>clean package</defaultGoal>
 
         <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-resources-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>copy-fit-classes</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>copy-resources</goal>
+                </goals>
+                <configuration>
+                  <outputDirectory>${project.build.outputDirectory}/org/apache/syncope/fit/core/reference</outputDirectory>
+                  <resources>
+                    <resource>
+                      <directory>${basedir}/../../../fit/core-reference/target/classes/org/apache/syncope/fit/core/reference</directory>
+                      <includes>
+                        <include>SampleReportConf.class</include>
+                      </includes>
+                    </resource>
+                  </resources>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+
           <plugin>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-maven-plugin</artifactId>
@@ -278,13 +303,21 @@ under the License.
               <jvmArguments>
                 -Djavax.net.ssl.trustStore=${basedir}/../../../fit/wa-reference/src/test/resources/keystore.jks -Djavax.net.ssl.trustStorePassword=password
                 -Dwicket.core.settings.general.configuration-type=development
-                -XX:HotswapAgent=fatjar
+                -XX:+AllowEnhancedClassRedefinition -XX:HotswapAgent=fatjar
                 -Xdebug -Xrunjdwp:transport=dt_socket,address=8003,server=y,suspend=n
               </jvmArguments>
               <profiles>
                 <profile>debug</profile>
               </profiles>
             </configuration>
+            <executions>
+              <execution>
+                <phase>package</phase>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+              </execution>
+            </executions>
           </plugin>
         </plugins>
 

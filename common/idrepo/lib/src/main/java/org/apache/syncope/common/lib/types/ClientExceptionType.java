@@ -18,7 +18,7 @@
  */
 package org.apache.syncope.common.lib.types;
 
-import javax.ws.rs.core.Response;
+import jakarta.ws.rs.core.Response;
 
 public enum ClientExceptionType {
 
@@ -29,7 +29,6 @@ public enum ClientExceptionType {
     DataIntegrityViolation(Response.Status.CONFLICT),
     EntityExists(Response.Status.CONFLICT),
     GenericPersistence(Response.Status.BAD_REQUEST),
-    HasChildren(Response.Status.BAD_REQUEST),
     InvalidAccessToken(Response.Status.INTERNAL_SERVER_ERROR),
     InvalidPrivilege(Response.Status.BAD_REQUEST),
     InvalidImplementation(Response.Status.BAD_REQUEST),

@@ -24,14 +24,14 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import org.apache.http.Consts;
 import org.apache.http.HttpStatus;
 import org.apache.http.NameValuePair;
@@ -71,7 +71,7 @@ public class CASSRAITCase extends AbstractSRAITCase {
                     CASSPClientAppTO app = new CASSPClientAppTO();
                     app.setName(appName);
                     app.setClientAppId(4L);
-                    app.setServiceId("http://localhost:8080/.*");
+                    app.setServiceId("http://127.0.0.1:8080/.*");
 
                     Response response = CLIENT_APP_SERVICE.create(ClientAppType.CASSP, app);
                     if (response.getStatusInfo().getStatusCode() != Response.Status.CREATED.getStatusCode()) {

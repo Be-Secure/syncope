@@ -19,7 +19,6 @@
 package org.apache.syncope.core.provisioning.java.pushpull;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -41,11 +40,8 @@ import org.apache.syncope.core.persistence.api.entity.AnyUtilsFactory;
 import org.apache.syncope.core.persistence.api.entity.ExternalResource;
 import org.apache.syncope.core.persistence.api.entity.Implementation;
 import org.apache.syncope.core.persistence.api.entity.Realm;
-import org.apache.syncope.core.persistence.api.entity.anyobject.AnyObject;
-import org.apache.syncope.core.persistence.api.entity.group.Group;
+import org.apache.syncope.core.persistence.api.entity.policy.PushPolicy;
 import org.apache.syncope.core.persistence.api.entity.task.PushTask;
-import org.apache.syncope.core.persistence.api.entity.task.PushTaskAnyFilter;
-import org.apache.syncope.core.persistence.api.entity.user.User;
 import org.apache.syncope.core.persistence.api.search.SearchCondConverter;
 import org.apache.syncope.core.persistence.api.search.SearchCondVisitor;
 import org.apache.syncope.core.provisioning.api.Connector;
@@ -55,6 +51,7 @@ import org.apache.syncope.core.provisioning.api.pushpull.GroupPushResultHandler;
 import org.apache.syncope.core.provisioning.api.pushpull.ProvisioningProfile;
 import org.apache.syncope.core.provisioning.api.pushpull.PushActions;
 import org.apache.syncope.core.provisioning.api.pushpull.RealmPushResultHandler;
+import org.apache.syncope.core.provisioning.api.pushpull.SyncopePushExecutor;
 import org.apache.syncope.core.provisioning.api.pushpull.SyncopePushResultHandler;
 import org.apache.syncope.core.provisioning.api.pushpull.UserPushResultHandler;
 import org.apache.syncope.core.spring.ApplicationContextProvider;
@@ -64,11 +61,8 @@ import org.quartz.JobExecutionException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.support.AbstractBeanDefinition;
 
-public class PushJobDelegate extends AbstractProvisioningJobDelegate<PushTask> {
+public class PushJobDelegate extends AbstractProvisioningJobDelegate<PushTask> implements SyncopePushExecutor {
 
-    /**
-     * Search DAO.
-     */
     @Autowired
     protected AnySearchDAO searchDAO;
 
@@ -83,11 +77,12 @@ public class PushJobDelegate extends AbstractProvisioningJobDelegate<PushTask> {
 
     protected ProvisioningProfile<PushTask, PushActions> profile;
 
-    protected final Map<String, MutablePair<Integer, String>> handled = new HashMap<>();
+    protected final Map<String, MutablePair<Integer, String>> handled = new ConcurrentHashMap<>();
 
     protected final Map<String, PushActions> perContextActions = new ConcurrentHashMap<>();
 
-    protected void reportHandled(final String anyType, final String key) {
+    @Override
+    public void reportHandled(final String anyType, final String key) {
         MutablePair<Integer, String> pair = handled.get(anyType);
         if (pair == null) {
             pair = MutablePair.of(0, null);
@@ -95,44 +90,43 @@ public class PushJobDelegate extends AbstractProvisioningJobDelegate<PushTask> {
         }
         pair.setLeft(pair.getLeft() + 1);
         pair.setRight(key);
+
+        if (!handled.isEmpty()) {
+            StringBuilder builder = new StringBuilder("Processed:\n");
+            handled.forEach((k, v) -> builder.append(' ').append(v.getLeft()).append('\t').
+                    append(k).
+                    append(" / latest: ").append(v.getRight()).
+                    append('\n'));
+            setStatus(builder.toString());
+        }
     }
 
     @Override
-    public String currentStatus() {
-        synchronized (status) {
-            if (!handled.isEmpty()) {
-                StringBuilder builder = new StringBuilder("Processed:\n");
-                handled.forEach((key, value) -> builder.append(' ').append(value.getLeft()).append('\t').
-                        append(key).
-                        append(" / latest: ").append(value.getRight()).
-                        append('\n'));
-                status.set(builder.toString());
-            }
-        }
-        return status.get();
+    public boolean wasInterruptRequested() {
+        return interrupt;
     }
 
-    protected void doHandle(
+    @Override
+    public void setInterrupted() {
+        this.interrupted = true;
+    }
+
+    protected boolean doHandle(
             final List<? extends Any<?>> anys,
-            final SyncopePushResultHandler handler,
+            final PushResultHandlerDispatcher dispatcher,
             final ExternalResource resource)
             throws JobExecutionException {
 
-        for (int i = 0; i < anys.size() && !interrupt; i++) {
+        boolean result = true;
+        for (int i = 0; i < anys.size() && result; i++) {
             try {
-                handler.handle(anys.get(i).getKey());
-                reportHandled(
-                        anys.get(i).getType().getKey(),
-                        (anys.get(i) instanceof User
-                        ? ((User) anys.get(i)).getUsername()
-                        : anys.get(i) instanceof Group
-                        ? ((Group) anys.get(i)).getName()
-                        : ((AnyObject) anys.get(i)).getName()));
+                result = dispatcher.handle(anys.get(i).getType().getKey(), anys.get(i).getKey());
             } catch (Exception e) {
                 LOG.warn("Failure pushing '{}' on '{}'", anys.get(i), resource, e);
                 throw new JobExecutionException("While pushing " + anys.get(i) + " on " + resource, e);
             }
         }
+        return result;
     }
 
     protected RealmPushResultHandler buildRealmHandler() {
@@ -185,10 +179,13 @@ public class PushJobDelegate extends AbstractProvisioningJobDelegate<PushTask> {
         profile = new ProvisioningProfile<>(connector, pushTask);
         profile.getActions().addAll(getPushActions(pushTask.getActions()));
         profile.setDryRun(dryRun);
-        profile.setConflictResolutionAction(pushTask.getResource().getPushPolicy() == null
-                ? ConflictResolutionAction.IGNORE
-                : pushTask.getResource().getPushPolicy().getConflictResolutionAction());
+        profile.setConflictResolutionAction(
+                Optional.ofNullable(pushTask.getResource().getPushPolicy()).
+                        map(PushPolicy::getConflictResolutionAction).
+                        orElse(ConflictResolutionAction.IGNORE));
         profile.setExecutor(executor);
+
+        PushResultHandlerDispatcher dispatcher = new PushResultHandlerDispatcher(profile, this);
 
         if (!profile.isDryRun()) {
             for (PushActions action : profile.getActions()) {
@@ -196,25 +193,29 @@ public class PushJobDelegate extends AbstractProvisioningJobDelegate<PushTask> {
             }
         }
 
-        status.set("Initialization completed");
+        setStatus("Initialization completed");
 
         // First realms...
         if (pushTask.getResource().getOrgUnit() != null) {
-            status.set("Pushing realms");
+            setStatus("Pushing realms");
 
-            RealmPushResultHandler handler = buildRealmHandler();
-            handler.setProfile(profile);
+            dispatcher.addHandlerSupplier(SyncopeConstants.REALM_ANYTYPE, () -> {
+                RealmPushResultHandler handler = buildRealmHandler();
+                handler.setProfile(profile);
+                return handler;
+            });
 
-            for (Realm realm : realmDAO.findDescendants(profile.getTask().getSourceRealm())) {
-                // Never push the root realm
-                if (realm.getParent() != null) {
-                    try {
-                        handler.handle(realm.getKey());
-                        reportHandled(SyncopeConstants.REALM_ANYTYPE, realm.getName());
-                    } catch (Exception e) {
-                        LOG.warn("Failure pushing '{}' on '{}'", realm, pushTask.getResource(), e);
-                        throw new JobExecutionException("While pushing " + realm + " on " + pushTask.getResource(), e);
-                    }
+            // Never push the root realm
+            List<Realm> realms = realmDAO.findDescendants(profile.getTask().getSourceRealm()).stream().
+                    filter(realm -> realm.getParent() != null).collect(Collectors.toList());
+            boolean result = true;
+            for (int i = 0; i < realms.size() && result; i++) {
+                try {
+                    result = dispatcher.handle(SyncopeConstants.REALM_ANYTYPE, realms.get(i).getKey());
+                } catch (Exception e) {
+                    LOG.warn("Failure pushing '{}' on '{}'", realms.get(i), pushTask.getResource(), e);
+                    throw new JobExecutionException(
+                            "While pushing " + realms.get(i) + " on " + pushTask.getResource(), e);
                 }
             }
         }
@@ -226,30 +227,32 @@ public class PushJobDelegate extends AbstractProvisioningJobDelegate<PushTask> {
                 filter(provision -> provision.getMapping() != null).sorted(provisionSorter).
                 collect(Collectors.toList())) {
 
-            status.set("Pushing " + provision.getAnyType());
+            setStatus("Pushing " + provision.getAnyType());
 
             AnyType anyType = anyTypeDAO.find(provision.getAnyType());
 
             AnyDAO<?> anyDAO = anyUtilsFactory.getInstance(anyType.getKind()).dao();
 
-            SyncopePushResultHandler handler;
-            switch (anyType.getKind()) {
-                case USER:
-                    handler = buildUserHandler();
-                    break;
+            dispatcher.addHandlerSupplier(provision.getAnyType(), () -> {
+                SyncopePushResultHandler handler;
+                switch (anyType.getKind()) {
+                    case USER:
+                        handler = buildUserHandler();
+                        break;
 
-                case GROUP:
-                    handler = buildGroupHandler();
-                    break;
+                    case GROUP:
+                        handler = buildGroupHandler();
+                        break;
 
-                case ANY_OBJECT:
-                default:
-                    handler = buildAnyObjectHandler();
-            }
-            handler.setProfile(profile);
+                    case ANY_OBJECT:
+                    default:
+                        handler = buildAnyObjectHandler();
+                }
+                handler.setProfile(profile);
+                return handler;
+            });
 
-            Optional<? extends PushTaskAnyFilter> anyFilter = pushTask.getFilter(anyType);
-            String filter = anyFilter.map(PushTaskAnyFilter::getFIQLCond).orElse(null);
+            String filter = pushTask.getFilter(anyType.getKey()).orElse(null);
             SearchCond cond = StringUtils.isBlank(filter)
                     ? anyDAO.getAllMatchingCond()
                     : SearchCondConverter.convert(searchCondVisitor, filter);
@@ -259,7 +262,8 @@ public class PushJobDelegate extends AbstractProvisioningJobDelegate<PushTask> {
                     Set.of(profile.getTask().getSourceRealm().getFullPath()),
                     cond,
                     anyType.getKind());
-            for (int page = 1; page <= (count / AnyDAO.DEFAULT_PAGE_SIZE) + 1 && !interrupt; page++) {
+            boolean result = true;
+            for (int page = 1; page <= (count / AnyDAO.DEFAULT_PAGE_SIZE) + 1 && result; page++) {
                 List<? extends Any<?>> anys = searchDAO.search(
                         profile.getTask().getSourceRealm(),
                         true,
@@ -269,21 +273,19 @@ public class PushJobDelegate extends AbstractProvisioningJobDelegate<PushTask> {
                         AnyDAO.DEFAULT_PAGE_SIZE,
                         List.of(),
                         anyType.getKind());
-                doHandle(anys, handler, pushTask.getResource());
+                result = doHandle(anys, dispatcher, pushTask.getResource());
             }
         }
 
-        if (!profile.isDryRun() && !interrupt) {
+        if (!profile.isDryRun()) {
             for (PushActions action : profile.getActions()) {
                 action.afterAll(profile);
             }
         }
 
-        if (interrupt) {
-            interrupted = true;
-        }
+        dispatcher.cleanup();
 
-        status.set("Push done");
+        setStatus("Push done");
 
         String result = createReport(profile.getResults(), pushTask.getResource(), dryRun);
         LOG.debug("Push result: {}", result);

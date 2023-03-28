@@ -18,10 +18,10 @@
  */
 package org.apache.syncope.core.persistence.jpa;
 
+import jakarta.persistence.ValidationMode;
+import jakarta.validation.Validator;
 import java.util.HashMap;
 import java.util.Map;
-import javax.persistence.ValidationMode;
-import javax.validation.Validator;
 import org.apache.syncope.common.keymaster.client.api.ConfParamOps;
 import org.apache.syncope.common.keymaster.client.api.DomainOps;
 import org.apache.syncope.core.persistence.api.DomainHolder;
@@ -49,6 +49,7 @@ import org.apache.syncope.core.persistence.api.dao.ExternalResourceDAO;
 import org.apache.syncope.core.persistence.api.dao.FIQLQueryDAO;
 import org.apache.syncope.core.persistence.api.dao.GroupDAO;
 import org.apache.syncope.core.persistence.api.dao.ImplementationDAO;
+import org.apache.syncope.core.persistence.api.dao.JobStatusDAO;
 import org.apache.syncope.core.persistence.api.dao.MailTemplateDAO;
 import org.apache.syncope.core.persistence.api.dao.NotificationDAO;
 import org.apache.syncope.core.persistence.api.dao.OIDCJWKSDAO;
@@ -62,7 +63,6 @@ import org.apache.syncope.core.persistence.api.dao.RelationshipTypeDAO;
 import org.apache.syncope.core.persistence.api.dao.RemediationDAO;
 import org.apache.syncope.core.persistence.api.dao.ReportDAO;
 import org.apache.syncope.core.persistence.api.dao.ReportExecDAO;
-import org.apache.syncope.core.persistence.api.dao.ReportTemplateDAO;
 import org.apache.syncope.core.persistence.api.dao.RoleDAO;
 import org.apache.syncope.core.persistence.api.dao.SAML2IdPEntityDAO;
 import org.apache.syncope.core.persistence.api.dao.SAML2SPClientAppDAO;
@@ -106,6 +106,7 @@ import org.apache.syncope.core.persistence.jpa.dao.JPAExternalResourceDAO;
 import org.apache.syncope.core.persistence.jpa.dao.JPAFIQLQueryDAO;
 import org.apache.syncope.core.persistence.jpa.dao.JPAGroupDAO;
 import org.apache.syncope.core.persistence.jpa.dao.JPAImplementationDAO;
+import org.apache.syncope.core.persistence.jpa.dao.JPAJobStatusDAO;
 import org.apache.syncope.core.persistence.jpa.dao.JPAMailTemplateDAO;
 import org.apache.syncope.core.persistence.jpa.dao.JPANotificationDAO;
 import org.apache.syncope.core.persistence.jpa.dao.JPAOIDCJWKSDAO;
@@ -119,7 +120,6 @@ import org.apache.syncope.core.persistence.jpa.dao.JPARelationshipTypeDAO;
 import org.apache.syncope.core.persistence.jpa.dao.JPARemediationDAO;
 import org.apache.syncope.core.persistence.jpa.dao.JPAReportDAO;
 import org.apache.syncope.core.persistence.jpa.dao.JPAReportExecDAO;
-import org.apache.syncope.core.persistence.jpa.dao.JPAReportTemplateDAO;
 import org.apache.syncope.core.persistence.jpa.dao.JPARoleDAO;
 import org.apache.syncope.core.persistence.jpa.dao.JPASAML2IdPEntityDAO;
 import org.apache.syncope.core.persistence.jpa.dao.JPASAML2SPClientAppDAO;
@@ -526,6 +526,12 @@ public class PersistenceContext {
 
     @ConditionalOnMissingBean
     @Bean
+    public JobStatusDAO jobStatusDAO() {
+        return new JPAJobStatusDAO();
+    }
+
+    @ConditionalOnMissingBean
+    @Bean
     public MailTemplateDAO mailTemplateDAO() {
         return new JPAMailTemplateDAO();
     }
@@ -605,12 +611,6 @@ public class PersistenceContext {
     @Bean
     public RemediationDAO remediationDAO() {
         return new JPARemediationDAO();
-    }
-
-    @ConditionalOnMissingBean
-    @Bean
-    public ReportTemplateDAO reportTemplateDAO() {
-        return new JPAReportTemplateDAO();
     }
 
     @ConditionalOnMissingBean

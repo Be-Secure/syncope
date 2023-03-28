@@ -24,11 +24,12 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
-import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.syncope.common.lib.SyncopeClientException;
@@ -39,6 +40,7 @@ import org.apache.syncope.common.lib.auth.GoogleMfaAuthModuleConf;
 import org.apache.syncope.common.lib.auth.JDBCAuthModuleConf;
 import org.apache.syncope.common.lib.auth.JaasAuthModuleConf;
 import org.apache.syncope.common.lib.auth.LDAPAuthModuleConf;
+import org.apache.syncope.common.lib.auth.OAuth20AuthModuleConf;
 import org.apache.syncope.common.lib.auth.OIDCAuthModuleConf;
 import org.apache.syncope.common.lib.auth.SAML2IdPAuthModuleConf;
 import org.apache.syncope.common.lib.auth.StaticAuthModuleConf;
@@ -62,7 +64,8 @@ public class AuthModuleITCase extends AbstractITCase {
         JAAS,
         JDBC,
         U2F,
-        OIDC;
+        OIDC,
+        OAUTH20;
 
     };
 
@@ -90,7 +93,7 @@ public class AuthModuleITCase extends AbstractITCase {
                 LDAPAuthModuleConf.class.cast(conf).setSearchFilter("cn={user}");
                 LDAPAuthModuleConf.class.cast(conf).setSubtreeSearch(true);
                 LDAPAuthModuleConf.class.cast(conf).setLdapUrl("ldap://localhost:1389");
-                LDAPAuthModuleConf.class.cast(conf).setUserIdAttribute("uid");
+                LDAPAuthModuleConf.class.cast(conf).setPrincipalAttributeId("uid");
                 LDAPAuthModuleConf.class.cast(conf).setBaseDn("cn=Directory Manager,dc=example,dc=org");
                 LDAPAuthModuleConf.class.cast(conf).setBindCredential("Password");
                 break;
@@ -125,8 +128,6 @@ public class AuthModuleITCase extends AbstractITCase {
                 conf = new JDBCAuthModuleConf();
                 JDBCAuthModuleConf.class.cast(conf).setSql("SELECT * FROM table WHERE name=?");
                 JDBCAuthModuleConf.class.cast(conf).setFieldPassword("password");
-                JDBCAuthModuleConf.class.cast(conf).getPrincipalAttributeList().addAll(
-                        List.of("sn", "cn:commonName", "givenName"));
                 break;
 
             case OIDC:
@@ -136,6 +137,22 @@ public class AuthModuleITCase extends AbstractITCase {
                 OIDCAuthModuleConf.class.cast(conf).setUserIdAttribute("username");
                 OIDCAuthModuleConf.class.cast(conf).setResponseType("code");
                 OIDCAuthModuleConf.class.cast(conf).setScope("openid email profile");
+                break;
+
+            case OAUTH20:
+                conf = new OAuth20AuthModuleConf();
+                OAuth20AuthModuleConf.class.cast(conf).setClientId("OAUTH20TestId");
+                OAuth20AuthModuleConf.class.cast(conf).setClientSecret("secret");
+                OAuth20AuthModuleConf.class.cast(conf).setClientName("oauth20");
+                OAuth20AuthModuleConf.class.cast(conf).setEnabled(true);
+                OAuth20AuthModuleConf.class.cast(conf).setCustomParams(Map.of("param1", "param1"));
+                OAuth20AuthModuleConf.class.cast(conf).setAuthUrl("https://localhost/oauth2/auth");
+                OAuth20AuthModuleConf.class.cast(conf).setProfileUrl("https://localhost/oauth2/profile");
+                OAuth20AuthModuleConf.class.cast(conf).setTokenUrl("https://localhost/oauth2/token");
+                OAuth20AuthModuleConf.class.cast(conf).setResponseType("code");
+                OAuth20AuthModuleConf.class.cast(conf).setScope("oauth test");
+                OAuth20AuthModuleConf.class.cast(conf).setUserIdAttribute("username");
+                OAuth20AuthModuleConf.class.cast(conf).setWithState(true);
                 break;
 
             case SAML2_IDP:
@@ -216,6 +233,9 @@ public class AuthModuleITCase extends AbstractITCase {
         assertTrue(authModuleTOs.stream().anyMatch(
                 authModule -> isSpecificConf(authModule.getConf(), U2FAuthModuleConf.class)
                 && authModule.getKey().equals("DefaultU2FAuthModule")));
+        assertTrue(authModuleTOs.stream().anyMatch(
+                authModule -> isSpecificConf(authModule.getConf(), OAuth20AuthModuleConf.class)
+                        && authModule.getKey().equals("DefaultOAuth20AuthModule")));
     }
 
     @Test
@@ -264,6 +284,16 @@ public class AuthModuleITCase extends AbstractITCase {
         assertNotNull(authModuleTO);
         assertTrue(StringUtils.isNotBlank(authModuleTO.getDescription()));
         assertTrue(isSpecificConf(authModuleTO.getConf(), OIDCAuthModuleConf.class));
+        assertFalse(isSpecificConf(authModuleTO.getConf(), SAML2IdPAuthModuleConf.class));
+    }
+
+    @Test
+    public void getOAuth20AuthModule() {
+        AuthModuleTO authModuleTO = AUTH_MODULE_SERVICE.read("DefaultOAuth20AuthModule");
+
+        assertNotNull(authModuleTO);
+        assertTrue(StringUtils.isNotBlank(authModuleTO.getDescription()));
+        assertTrue(isSpecificConf(authModuleTO.getConf(), OAuth20AuthModuleConf.class));
         assertFalse(isSpecificConf(authModuleTO.getConf(), SAML2IdPAuthModuleConf.class));
     }
 
@@ -441,6 +471,29 @@ public class AuthModuleITCase extends AbstractITCase {
 
         conf = newOIDCAuthModuleTO.getConf();
         assertEquals("newCode", OIDCAuthModuleConf.class.cast(conf).getResponseType());
+    }
+
+    @Test
+    public void updateOAuth20AuthModule() {
+        AuthModuleTO oauth20AuthModuleTO = AUTH_MODULE_SERVICE.read("DefaultOAuth20AuthModule");
+        assertNotNull(oauth20AuthModuleTO);
+
+        AuthModuleTO newoauth20AuthModuleTO = buildAuthModuleTO(AuthModuleSupportedType.OAUTH20);
+        newoauth20AuthModuleTO = createAuthModule(newoauth20AuthModuleTO);
+        assertNotNull(newoauth20AuthModuleTO);
+
+        AuthModuleConf conf = oauth20AuthModuleTO.getConf();
+        assertNotNull(conf);
+        OAuth20AuthModuleConf.class.cast(conf).setClientName("OAUTH APP");
+        newoauth20AuthModuleTO.setConf(conf);
+
+        // update new auth module
+        AUTH_MODULE_SERVICE.update(newoauth20AuthModuleTO);
+        newoauth20AuthModuleTO = AUTH_MODULE_SERVICE.read(newoauth20AuthModuleTO.getKey());
+        assertNotNull(newoauth20AuthModuleTO);
+
+        conf = newoauth20AuthModuleTO.getConf();
+        assertEquals("OAUTH APP", OAuth20AuthModuleConf.class.cast(conf).getClientName());
     }
 
     @Test

@@ -21,6 +21,7 @@ package org.apache.syncope.client.console.clientapps;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -55,6 +56,7 @@ import org.apache.syncope.common.lib.to.RealmTO;
 import org.apache.syncope.common.lib.types.ClientAppType;
 import org.apache.syncope.common.lib.types.OIDCGrantType;
 import org.apache.syncope.common.lib.types.OIDCResponseType;
+import org.apache.syncope.common.lib.types.OIDCScope;
 import org.apache.syncope.common.lib.types.OIDCSubjectType;
 import org.apache.syncope.common.lib.types.PolicyType;
 import org.apache.syncope.common.lib.types.SAML2SPNameId;
@@ -84,7 +86,7 @@ public class ClientAppModalPanelBuilder<T extends ClientAppTO> extends AbstractM
         @Override
         protected Map<String, String> load() {
             return PolicyRestClient.list(PolicyType.ACCESS).stream().
-                    collect(Collectors.toMap(PolicyTO::getKey, PolicyTO::getName));
+                    collect(Collectors.toMap(PolicyTO::getKey, PolicyTO::getName, (v1, v2) -> v1, LinkedHashMap::new));
         }
     };
 
@@ -95,7 +97,7 @@ public class ClientAppModalPanelBuilder<T extends ClientAppTO> extends AbstractM
         @Override
         protected Map<String, String> load() {
             return PolicyRestClient.list(PolicyType.ATTR_RELEASE).stream().
-                    collect(Collectors.toMap(PolicyTO::getKey, PolicyTO::getName));
+                    collect(Collectors.toMap(PolicyTO::getKey, PolicyTO::getName, (v1, v2) -> v1, LinkedHashMap::new));
         }
     };
 
@@ -106,7 +108,18 @@ public class ClientAppModalPanelBuilder<T extends ClientAppTO> extends AbstractM
         @Override
         protected Map<String, String> load() {
             return PolicyRestClient.list(PolicyType.AUTH).stream().
-                    collect(Collectors.toMap(PolicyTO::getKey, PolicyTO::getName));
+                    collect(Collectors.toMap(PolicyTO::getKey, PolicyTO::getName, (v1, v2) -> v1, LinkedHashMap::new));
+        }
+    };
+
+    private final IModel<Map<String, String>> ticketExpirationPolicies = new LoadableDetachableModel<>() {
+
+        private static final long serialVersionUID = -2012833443695917883L;
+
+        @Override
+        protected Map<String, String> load() {
+            return PolicyRestClient.list(PolicyType.TICKET_EXPIRATION).stream().
+                    collect(Collectors.toMap(PolicyTO::getKey, PolicyTO::getName, (v1, v2) -> v1, LinkedHashMap::new));
         }
     };
 
@@ -180,29 +193,53 @@ public class ClientAppModalPanelBuilder<T extends ClientAppTO> extends AbstractM
                     "field", Constants.DESCRIPTION_FIELD_NAME,
                     new PropertyModel<>(clientAppTO, Constants.DESCRIPTION_FIELD_NAME), false));
 
+            fields.add(new AjaxTextFieldPanel(
+                    "field", "logo",
+                    new PropertyModel<>(clientAppTO, "logo"), false));
+
+            fields.add(new AjaxTextFieldPanel(
+                    "field", "theme",
+                    new PropertyModel<>(clientAppTO, "theme"), false));
+
+            AjaxTextFieldPanel informationUrl = new AjaxTextFieldPanel(
+                    "field", "informationUrl",
+                    new PropertyModel<>(clientAppTO, "informationUrl"), false);
+            informationUrl.addValidator(new UrlValidator());
+            fields.add(informationUrl);
+
+            AjaxTextFieldPanel privacyUrl = new AjaxTextFieldPanel(
+                    "field", "privacyUrl",
+                    new PropertyModel<>(clientAppTO, "privacyUrl"), false);
+            privacyUrl.addValidator(new UrlValidator());
+            fields.add(privacyUrl);
+
             AjaxDropDownChoicePanel<String> accessPolicy = new AjaxDropDownChoicePanel<>(
                     "field", "accessPolicy", new PropertyModel<>(clientAppTO, "accessPolicy"), false);
-            accessPolicy.setChoiceRenderer(new PolicyRenderer(accessPolicies));
+            accessPolicy.setChoiceRenderer(new PolicyRenderer(accessPolicies.getObject()));
             accessPolicy.setChoices(new ArrayList<>(accessPolicies.getObject().keySet()));
             ((AbstractSingleSelectChoice<?>) accessPolicy.getField()).setNullValid(true);
             fields.add(accessPolicy);
 
             AjaxDropDownChoicePanel<String> attrReleasePolicy = new AjaxDropDownChoicePanel<>(
                     "field", "attrReleasePolicy", new PropertyModel<>(clientAppTO, "attrReleasePolicy"), false);
-            attrReleasePolicy.setChoiceRenderer(new PolicyRenderer(attrReleasePolicies));
+            attrReleasePolicy.setChoiceRenderer(new PolicyRenderer(attrReleasePolicies.getObject()));
             attrReleasePolicy.setChoices(new ArrayList<>(attrReleasePolicies.getObject().keySet()));
             ((AbstractSingleSelectChoice<?>) attrReleasePolicy.getField()).setNullValid(true);
             fields.add(attrReleasePolicy);
 
             AjaxDropDownChoicePanel<String> authPolicy = new AjaxDropDownChoicePanel<>(
                     "field", "authPolicy", new PropertyModel<>(clientAppTO, "authPolicy"), false);
-            authPolicy.setChoiceRenderer(new PolicyRenderer(authPolicies));
+            authPolicy.setChoiceRenderer(new PolicyRenderer(authPolicies.getObject()));
             authPolicy.setChoices(new ArrayList<>(authPolicies.getObject().keySet()));
-            authPolicy.setRequired(true);
-            ((AbstractSingleSelectChoice<?>) authPolicy.getField()).setNullValid(true);
             fields.add(authPolicy);
 
-            fields.add(new AjaxTextFieldPanel("field", "theme", new PropertyModel<>(clientAppTO, "theme"), false));
+            AjaxDropDownChoicePanel<String> ticketExpirationPolicy = new AjaxDropDownChoicePanel<>(
+                    "field", "ticketExpirationPolicy",
+                    new PropertyModel<>(clientAppTO, "ticketExpirationPolicy"), false);
+            ticketExpirationPolicy.setChoiceRenderer(new PolicyRenderer(ticketExpirationPolicies.getObject()));
+            ticketExpirationPolicy.setChoices(new ArrayList<>(ticketExpirationPolicies.getObject().keySet()));
+            ((AbstractSingleSelectChoice<?>) ticketExpirationPolicy.getField()).setNullValid(true);
+            fields.add(ticketExpirationPolicy);
 
             switch (type) {
                 case CASSP:
@@ -247,7 +284,6 @@ public class ClientAppModalPanelBuilder<T extends ClientAppTO> extends AbstractM
                     fields.add(subjectType);
 
                     AjaxTextFieldPanel redirectUri = new AjaxTextFieldPanel("panel", "redirectUris", new Model<>());
-                    redirectUri.addValidator(new UrlValidator());
                     fields.add(new MultiFieldPanel.Builder<String>(
                             new PropertyModel<>(clientAppTO, "redirectUris")).build(
                             "field",
@@ -264,6 +300,11 @@ public class ClientAppModalPanelBuilder<T extends ClientAppTO> extends AbstractM
                             new PropertyModel<>(clientAppTO, "supportedResponseTypes"),
                             new ListModel<>(List.of(OIDCResponseType.values()))));
 
+                    fields.add(new AjaxPalettePanel.Builder<OIDCScope>().setName("scopes").build(
+                            "field",
+                            new PropertyModel<>(clientAppTO, "scopes"),
+                            new ListModel<>(List.of(OIDCScope.values()))));
+
                     AjaxTextFieldPanel logoutUri = new AjaxTextFieldPanel(
                             "field", "logoutUri", new PropertyModel<>(clientAppTO, "logoutUri"), false);
                     logoutUri.addValidator(new UrlValidator());
@@ -273,7 +314,6 @@ public class ClientAppModalPanelBuilder<T extends ClientAppTO> extends AbstractM
                 case SAML2SP:
                     AjaxTextFieldPanel entityId = new AjaxTextFieldPanel(
                             "field", "entityId", new PropertyModel<>(clientAppTO, "entityId"), false);
-                    entityId.addValidator(new UrlValidator());
                     fields.add(entityId.setRequired(true));
 
                     fields.add(new AjaxTextFieldPanel("field", "metadataLocation",

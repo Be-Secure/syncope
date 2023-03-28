@@ -35,10 +35,12 @@ import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.cxf.jaxrs.client.Client;
+import org.apache.syncope.client.console.commons.AccessPolicyConfProvider;
 import org.apache.syncope.client.console.commons.AnyDirectoryPanelAdditionalActionLinksProvider;
 import org.apache.syncope.client.console.commons.AnyDirectoryPanelAdditionalActionsProvider;
 import org.apache.syncope.client.console.commons.AnyWizardBuilderAdditionalSteps;
 import org.apache.syncope.client.console.commons.ExternalResourceProvider;
+import org.apache.syncope.client.console.commons.IdRepoAccessPolicyConfProvider;
 import org.apache.syncope.client.console.commons.IdRepoAnyDirectoryPanelAdditionalActionLinksProvider;
 import org.apache.syncope.client.console.commons.IdRepoAnyDirectoryPanelAdditionalActionsProvider;
 import org.apache.syncope.client.console.commons.IdRepoAnyWizardBuilderAdditionalSteps;
@@ -53,7 +55,6 @@ import org.apache.syncope.client.console.commons.PreviewUtils;
 import org.apache.syncope.client.console.commons.StatusProvider;
 import org.apache.syncope.client.console.commons.VirSchemaDetailsPanelProvider;
 import org.apache.syncope.client.console.init.ClassPathScanImplementationLookup;
-import org.apache.syncope.client.console.wizards.any.UserFormFinalizerUtils;
 import org.apache.syncope.client.lib.AuthenticationHandler;
 import org.apache.syncope.client.lib.SyncopeClient;
 import org.apache.syncope.client.lib.SyncopeClientFactoryBean;
@@ -78,6 +79,7 @@ import org.apache.syncope.common.rest.api.service.SyncopeService;
 import org.apache.wicket.util.tester.WicketTester;
 import org.junit.jupiter.api.BeforeAll;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -156,11 +158,6 @@ public abstract class AbstractTest {
         }
 
         @Bean
-        public UserFormFinalizerUtils userFormFinalizerUtils() {
-            return new UserFormFinalizerUtils();
-        }
-
-        @Bean
         public ExternalResourceProvider resourceProvider() {
             return new IdRepoExternalResourceProvider();
         }
@@ -199,9 +196,33 @@ public abstract class AbstractTest {
         public PolicyTabProvider policyTabProvider() {
             return new IdRepoPolicyTabProvider();
         }
+
+        @Bean
+        public AccessPolicyConfProvider accessPolicyConfProvider() {
+            return new IdRepoAccessPolicyConfProvider();
+        }
     }
 
     public static class TestSyncopeWebApplication extends SyncopeWebApplication {
+
+        public TestSyncopeWebApplication(
+                final ConsoleProperties props,
+                final ClassPathScanImplementationLookup lookup,
+                final ServiceOps serviceOps,
+                final ExternalResourceProvider resourceProvider,
+                final AnyDirectoryPanelAdditionalActionsProvider anyDirectoryPanelAdditionalActionsProvider,
+                final AnyDirectoryPanelAdditionalActionLinksProvider anyDirectoryPanelAdditionalActionLinksProvider,
+                final AnyWizardBuilderAdditionalSteps anyWizardBuilderAdditionalSteps,
+                final StatusProvider statusProvider,
+                final VirSchemaDetailsPanelProvider virSchemaDetailsPanelProvider,
+                final ImplementationInfoProvider implementationInfoProvider,
+                final AccessPolicyConfProvider accessPolicyConfProvider,
+                final ApplicationContext ctx) {
+
+            super(props, lookup, serviceOps, resourceProvider, anyDirectoryPanelAdditionalActionsProvider,
+                    anyDirectoryPanelAdditionalActionLinksProvider, anyWizardBuilderAdditionalSteps, statusProvider,
+                    virSchemaDetailsPanelProvider, implementationInfoProvider, accessPolicyConfProvider, ctx);
+        }
 
         public interface SyncopeServiceClient extends SyncopeService, Client {
         }

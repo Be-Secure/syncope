@@ -18,10 +18,10 @@
  */
 package org.apache.syncope.core.persistence.jpa.dao;
 
+import jakarta.persistence.Query;
+import jakarta.persistence.TypedQuery;
 import java.util.Collection;
 import java.util.List;
-import javax.persistence.Query;
-import javax.persistence.TypedQuery;
 import org.apache.syncope.common.lib.types.AnyTypeKind;
 import org.apache.syncope.core.persistence.api.dao.ExternalResourceDAO;
 import org.apache.syncope.core.persistence.api.dao.PlainAttrDAO;
@@ -126,6 +126,7 @@ public class JPAPlainSchemaDAO extends AbstractDAO<PlainSchema> implements Plain
 
     @Override
     public PlainSchema save(final PlainSchema schema) {
+        ((JPAPlainSchema) schema).map2json();
         return entityManager().merge(schema);
     }
 
@@ -142,8 +143,6 @@ public class JPAPlainSchemaDAO extends AbstractDAO<PlainSchema> implements Plain
         if (schema == null) {
             return;
         }
-
-        schema.getLabels().forEach(label -> label.setSchema(null));
 
         deleteAttrs(schema);
 

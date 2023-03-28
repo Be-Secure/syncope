@@ -52,6 +52,7 @@ import org.apache.syncope.core.provisioning.api.serialization.POJOHelper;
 import org.apache.syncope.core.spring.security.AuthContextUtils;
 import org.apache.syncope.core.spring.security.AuthDataAccessor;
 import org.apache.syncope.core.spring.security.Encryptor;
+import org.pac4j.core.context.CallContext;
 import org.pac4j.core.exception.http.WithLocationAction;
 import org.pac4j.oidc.client.OidcClient;
 import org.pac4j.oidc.credentials.OidcCredentials;
@@ -94,23 +95,18 @@ public class OIDCC4UILogic extends AbstractTransactionalLogic<EntityTO> {
         return oidcClientCache.get(op.getName()).orElseGet(() -> oidcClientCache.add(op, callbackUrl));
     }
 
-    protected OidcClient getOidcClient(final String opName, final String callbackUrl) {
-        OIDCC4UIProvider op = opDAO.findByName(opName);
-        if (op == null) {
-            throw new NotFoundException("OIDC Provider '" + opName + '\'');
-        }
-
-        return getOidcClient(op, callbackUrl);
-    }
-
     @PreAuthorize("hasRole('" + IdRepoEntitlement.ANONYMOUS + "')")
     public OIDCRequest createLoginRequest(final String redirectURI, final String opName) {
+        // 0. look for OP
+        OIDCC4UIProvider op = Optional.ofNullable(opDAO.findByName(opName)).
+                orElseThrow(() -> new NotFoundException("OIDC Provider '" + opName + '\''));
+
         // 1. look for OidcClient
-        OidcClient oidcClient = getOidcClient(opName, redirectURI);
-        oidcClient.setCallbackUrl(redirectURI);
+        OidcClient oidcClient = getOidcClient(op, redirectURI);
 
         // 2. create OIDCRequest
-        WithLocationAction action = oidcClient.getRedirectionAction(new OIDC4UIContext(), NoOpSessionStore.INSTANCE).
+        WithLocationAction action = oidcClient.getRedirectionAction(
+                new CallContext(new OIDC4UIContext(), NoOpSessionStore.INSTANCE)).
                 map(WithLocationAction.class::cast).
                 orElseThrow(() -> {
                     SyncopeClientException sce = SyncopeClientException.build(ClientExceptionType.Unknown);
@@ -126,14 +122,11 @@ public class OIDCC4UILogic extends AbstractTransactionalLogic<EntityTO> {
     @PreAuthorize("hasRole('" + IdRepoEntitlement.ANONYMOUS + "')")
     public OIDCLoginResponse login(final String redirectURI, final String authorizationCode, final String opName) {
         // 0. look for OP
-        OIDCC4UIProvider op = opDAO.findByName(opName);
-        if (op == null) {
-            throw new NotFoundException("OIDC Provider '" + opName + '\'');
-        }
+        OIDCC4UIProvider op = Optional.ofNullable(opDAO.findByName(opName)).
+                orElseThrow(() -> new NotFoundException("OIDC Provider '" + opName + '\''));
 
         // 1. look for configured client
-        OidcClient oidcClient = getOidcClient(opName, redirectURI);
-        oidcClient.setCallbackUrl(redirectURI);
+        OidcClient oidcClient = getOidcClient(op, redirectURI);
 
         // 2. get OpenID Connect tokens
         String idTokenHint;
@@ -144,7 +137,7 @@ public class OIDCC4UILogic extends AbstractTransactionalLogic<EntityTO> {
 
             OIDC4UIContext ctx = new OIDC4UIContext();
 
-            oidcClient.getAuthenticator().validate(credentials, ctx, NoOpSessionStore.INSTANCE);
+            oidcClient.getAuthenticator().validate(new CallContext(ctx, NoOpSessionStore.INSTANCE), credentials);
 
             idToken = credentials.getIdToken().getJWTClaimsSet();
             idTokenHint = credentials.getIdToken().serialize();
@@ -263,17 +256,17 @@ public class OIDCC4UILogic extends AbstractTransactionalLogic<EntityTO> {
         }
 
         // 1. look for OidcClient
-        OidcClient oidcClient =
-                getOidcClient((String) claimsSet.getClaim(JWT_CLAIM_OP_NAME), redirectURI);
-        oidcClient.setCallbackUrl(redirectURI);
+        OIDCC4UIProvider op = Optional.ofNullable(opDAO.findByName((String) claimsSet.getClaim(JWT_CLAIM_OP_NAME))).
+                orElseThrow(() -> new NotFoundException(""
+                + "OIDC Provider '" + claimsSet.getClaim(JWT_CLAIM_OP_NAME) + '\''));
+        OidcClient oidcClient = getOidcClient(op, redirectURI);
 
         // 2. create OIDCRequest
         OidcProfile profile = new OidcProfile();
         profile.setIdTokenString((String) claimsSet.getClaim(JWT_CLAIM_ID_TOKEN));
 
         WithLocationAction action = oidcClient.getLogoutAction(
-                new OIDC4UIContext(),
-                NoOpSessionStore.INSTANCE,
+                new CallContext(new OIDC4UIContext(), NoOpSessionStore.INSTANCE),
                 profile,
                 redirectURI).
                 map(WithLocationAction.class::cast).

@@ -18,21 +18,14 @@
  */
 package org.apache.syncope.core.provisioning.java;
 
-import java.io.IOException;
-import java.io.PrintStream;
+import jakarta.annotation.Resource;
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
-import javax.annotation.Resource;
-import javax.mail.MessagingException;
-import javax.mail.Session;
-import javax.mail.Transport;
-import javax.naming.NamingException;
 import javax.sql.DataSource;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.syncope.common.keymaster.client.api.ConfParamOps;
-import org.apache.syncope.common.lib.LogOutputStream;
 import org.apache.syncope.core.persistence.api.DomainHolder;
 import org.apache.syncope.core.persistence.api.attrvalue.validation.PlainAttrValidationManager;
 import org.apache.syncope.core.persistence.api.dao.AccessTokenDAO;
@@ -42,7 +35,6 @@ import org.apache.syncope.core.persistence.api.dao.AnySearchDAO;
 import org.apache.syncope.core.persistence.api.dao.AnyTypeClassDAO;
 import org.apache.syncope.core.persistence.api.dao.AnyTypeDAO;
 import org.apache.syncope.core.persistence.api.dao.ApplicationDAO;
-import org.apache.syncope.core.persistence.api.dao.AttrRepoDAO;
 import org.apache.syncope.core.persistence.api.dao.AuditConfDAO;
 import org.apache.syncope.core.persistence.api.dao.AuthModuleDAO;
 import org.apache.syncope.core.persistence.api.dao.ConnInstanceDAO;
@@ -52,6 +44,7 @@ import org.apache.syncope.core.persistence.api.dao.DynRealmDAO;
 import org.apache.syncope.core.persistence.api.dao.ExternalResourceDAO;
 import org.apache.syncope.core.persistence.api.dao.GroupDAO;
 import org.apache.syncope.core.persistence.api.dao.ImplementationDAO;
+import org.apache.syncope.core.persistence.api.dao.JobStatusDAO;
 import org.apache.syncope.core.persistence.api.dao.MailTemplateDAO;
 import org.apache.syncope.core.persistence.api.dao.NotificationDAO;
 import org.apache.syncope.core.persistence.api.dao.PlainAttrDAO;
@@ -62,7 +55,6 @@ import org.apache.syncope.core.persistence.api.dao.RealmDAO;
 import org.apache.syncope.core.persistence.api.dao.RelationshipTypeDAO;
 import org.apache.syncope.core.persistence.api.dao.ReportDAO;
 import org.apache.syncope.core.persistence.api.dao.ReportExecDAO;
-import org.apache.syncope.core.persistence.api.dao.ReportTemplateDAO;
 import org.apache.syncope.core.persistence.api.dao.RoleDAO;
 import org.apache.syncope.core.persistence.api.dao.SecurityQuestionDAO;
 import org.apache.syncope.core.persistence.api.dao.TaskDAO;
@@ -120,7 +112,6 @@ import org.apache.syncope.core.provisioning.api.data.UserDataBinder;
 import org.apache.syncope.core.provisioning.api.data.WAConfigDataBinder;
 import org.apache.syncope.core.provisioning.api.data.wa.WAClientAppDataBinder;
 import org.apache.syncope.core.provisioning.api.job.JobManager;
-import org.apache.syncope.core.provisioning.api.job.report.ReportJobDelegate;
 import org.apache.syncope.core.provisioning.api.notification.NotificationJobDelegate;
 import org.apache.syncope.core.provisioning.api.notification.NotificationManager;
 import org.apache.syncope.core.provisioning.api.propagation.PropagationManager;
@@ -161,12 +152,12 @@ import org.apache.syncope.core.provisioning.java.data.UserDataBinderImpl;
 import org.apache.syncope.core.provisioning.java.data.WAConfigDataBinderImpl;
 import org.apache.syncope.core.provisioning.java.data.wa.WAClientAppDataBinderImpl;
 import org.apache.syncope.core.provisioning.java.job.DefaultJobManager;
+import org.apache.syncope.core.provisioning.java.job.JobStatusUpdater;
 import org.apache.syncope.core.provisioning.java.job.SchedulerDBInit;
 import org.apache.syncope.core.provisioning.java.job.SyncopeSpringBeanJobFactory;
 import org.apache.syncope.core.provisioning.java.job.SystemLoadReporterJob;
 import org.apache.syncope.core.provisioning.java.job.notification.DefaultNotificationJobDelegate;
 import org.apache.syncope.core.provisioning.java.job.notification.NotificationJob;
-import org.apache.syncope.core.provisioning.java.job.report.DefaultReportJobDelegate;
 import org.apache.syncope.core.provisioning.java.notification.DefaultNotificationManager;
 import org.apache.syncope.core.provisioning.java.propagation.DefaultPropagationManager;
 import org.apache.syncope.core.provisioning.java.propagation.PriorityPropagationTaskExecutor;
@@ -181,22 +172,21 @@ import org.apache.syncope.core.spring.security.jws.AccessTokenJWSSigner;
 import org.apache.syncope.core.workflow.api.AnyObjectWorkflowAdapter;
 import org.apache.syncope.core.workflow.api.GroupWorkflowAdapter;
 import org.apache.syncope.core.workflow.api.UserWorkflowAdapter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.core.task.support.TaskExecutorAdapter;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
-import org.springframework.jndi.JndiObjectFactoryBean;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -207,8 +197,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 @EnableConfigurationProperties(ProvisioningProperties.class)
 @Configuration(proxyBeanMethods = false)
 public class ProvisioningContext {
-
-    private static final Logger LOG = LoggerFactory.getLogger(ProvisioningContext.class);
 
     @Resource(name = "MasterDataSource")
     private DataSource masterDataSource;
@@ -255,6 +243,18 @@ public class ProvisioningContext {
                 return asyncConnectorFacadeExecutor;
             }
         };
+    }
+
+    /**
+     * This is a special thread executor that only created a single worker thread.
+     * This is necessary to allow job status update operations to queue up serially
+     * and not via multiple threads to avoid the "lost update" problem.
+     *
+     * @return the async task executor
+     */
+    @Bean
+    public AsyncTaskExecutor jobStatusUpdaterThreadExecutor() {
+        return new TaskExecutorAdapter(Executors.newSingleThreadExecutor());
     }
 
     /**
@@ -359,72 +359,8 @@ public class ProvisioningContext {
 
     @ConditionalOnMissingBean
     @Bean
-    public JavaMailSender mailSender(final ProvisioningProperties provisioningProperties)
-            throws IllegalArgumentException, IOException {
-        JavaMailSenderImpl mailSender = new JavaMailSenderImpl() {
-
-            @Override
-            protected Transport connectTransport() throws MessagingException {
-                // ensure that no auth means no auth
-                if (StringUtils.isBlank(getUsername())) {
-                    Transport transport = getTransport(getSession());
-                    transport.connect(getHost(), getPort(), null, null);
-                    return transport;
-                }
-
-                return super.connectTransport();
-            }
-        };
-        mailSender.setDefaultEncoding(provisioningProperties.getSmtp().getDefaultEncoding());
-        mailSender.setHost(provisioningProperties.getSmtp().getHost());
-        mailSender.setPort(provisioningProperties.getSmtp().getPort());
-        mailSender.setUsername(provisioningProperties.getSmtp().getUsername());
-        mailSender.setPassword(provisioningProperties.getSmtp().getPassword());
-        mailSender.setProtocol(provisioningProperties.getSmtp().getProtocol());
-
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("[Mail] host:port = {}:{}", mailSender.getHost(), mailSender.getPort());
-            LOG.debug("[Mail] protocol = {}", mailSender.getProtocol());
-            LOG.debug("[Mail] username = {}", mailSender.getUsername());
-            LOG.debug("[Mail] default encoding = {}", mailSender.getDefaultEncoding());
-        }
-
-        JndiObjectFactoryBean mailSession = new JndiObjectFactoryBean();
-        mailSession.setJndiName("mail/syncopeNotification");
-        try {
-            mailSession.afterPropertiesSet();
-        } catch (NamingException e) {
-            LOG.debug("While looking up JNDI for mail session", e);
-        }
-
-        Session session = (Session) mailSession.getObject();
-        if (session == null) {
-            Properties javaMailProperties = mailSender.getJavaMailProperties();
-
-            provisioningProperties.getSmtp().getJavamailProperties().
-                    forEach((key, value) -> javaMailProperties.setProperty(key, value));
-
-            if (StringUtils.isNotBlank(mailSender.getUsername())) {
-                javaMailProperties.setProperty("mail.smtp.auth", "true");
-            }
-
-            if (LOG.isDebugEnabled()) {
-                mailSender.getJavaMailProperties().
-                        forEach((key, value) -> LOG.debug("[Mail] property: {} = {}", key, value));
-            }
-
-            if (provisioningProperties.getSmtp().isDebug()) {
-                session = mailSender.getSession();
-                session.setDebug(true);
-                try (LogOutputStream los = new LogOutputStream(LOG)) {
-                    session.setDebugOut(new PrintStream(los));
-                }
-            }
-        } else {
-            mailSender.setSession(session);
-        }
-
-        return mailSender;
+    public JobStatusUpdater jobStatusUpdater(final JobStatusDAO jobStatusDAO, final EntityFactory entityFactory) {
+        return new JobStatusUpdater(jobStatusDAO, entityFactory);
     }
 
     @ConditionalOnMissingBean
@@ -627,7 +563,8 @@ public class ProvisioningContext {
             final AuditManager auditManager,
             final TaskDataBinder taskDataBinder,
             final OutboundMatcher outboundMatcher,
-            final PlainAttrValidationManager validator) {
+            final PlainAttrValidationManager validator,
+            final ApplicationEventPublisher publisher) {
 
         return new PriorityPropagationTaskExecutor(
                 connectorManager,
@@ -645,6 +582,7 @@ public class ProvisioningContext {
                 taskUtilsFactory,
                 outboundMatcher,
                 validator,
+                publisher,
                 propagationTaskExecutorAsyncExecutor);
     }
 
@@ -771,14 +709,16 @@ public class ProvisioningContext {
             final TaskDAO taskDAO,
             final JavaMailSender mailSender,
             final AuditManager auditManager,
-            final NotificationManager notificationManager) {
+            final NotificationManager notificationManager,
+            final ApplicationEventPublisher publisher) {
 
         return new DefaultNotificationJobDelegate(
                 taskDAO,
                 mailSender,
                 taskUtilsFactory,
                 auditManager,
-                notificationManager);
+                notificationManager,
+                publisher);
     }
 
     @ConditionalOnMissingBean
@@ -789,16 +729,6 @@ public class ProvisioningContext {
             final SecurityProperties securityProperties) {
 
         return new NotificationJob(securityProperties, domainHolder, delegate);
-    }
-
-    @ConditionalOnMissingBean
-    @Bean
-    public ReportJobDelegate reportJobDelegate(
-            final ReportDAO reportDAO,
-            final ReportExecDAO reportExecDAO,
-            final EntityFactory entityFactory) {
-
-        return new DefaultReportJobDelegate(reportDAO, reportExecDAO, entityFactory);
     }
 
     @ConditionalOnMissingBean
@@ -1102,12 +1032,11 @@ public class ProvisioningContext {
     @ConditionalOnMissingBean
     @Bean
     public ReportDataBinder reportDataBinder(
-            final ReportTemplateDAO reportTemplateDAO,
             final ReportExecDAO reportExecDAO,
             final ImplementationDAO implementationDAO,
             final SchedulerFactoryBean scheduler) {
 
-        return new ReportDataBinderImpl(reportTemplateDAO, reportExecDAO, implementationDAO, scheduler);
+        return new ReportDataBinderImpl(reportExecDAO, implementationDAO, scheduler);
     }
 
     @ConditionalOnMissingBean
@@ -1296,10 +1225,12 @@ public class ProvisioningContext {
             final ClientAppDataBinder clientAppDataBinder,
             final PolicyDataBinder policyDataBinder,
             final AuthModuleDataBinder authModuleDataBinder,
-            final AuthModuleDAO authModuleDAO,
-            final AttrRepoDAO attrRepoDAO) {
+            final AuthModuleDAO authModuleDAO) {
 
         return new WAClientAppDataBinderImpl(
-                clientAppDataBinder, policyDataBinder, authModuleDataBinder, authModuleDAO, attrRepoDAO);
+                clientAppDataBinder,
+                policyDataBinder,
+                authModuleDataBinder,
+                authModuleDAO);
     }
 }

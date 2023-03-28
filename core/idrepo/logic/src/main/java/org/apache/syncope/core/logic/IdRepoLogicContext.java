@@ -18,14 +18,24 @@
  */
 package org.apache.syncope.core.logic;
 
+import jakarta.validation.Validator;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.config.LoggerConfig;
 import org.apache.syncope.common.keymaster.client.api.ConfParamOps;
+import org.apache.syncope.common.lib.types.AuditLoggerName;
+import org.apache.syncope.core.logic.audit.AuditAppender;
+import org.apache.syncope.core.logic.audit.JdbcAuditAppender;
 import org.apache.syncope.core.logic.init.AuditAccessor;
 import org.apache.syncope.core.logic.init.AuditLoader;
 import org.apache.syncope.core.logic.init.ClassPathScanImplementationLookup;
 import org.apache.syncope.core.logic.init.EntitlementAccessor;
 import org.apache.syncope.core.logic.init.IdRepoEntitlementLoader;
 import org.apache.syncope.core.logic.init.IdRepoImplementationTypeLoader;
-import org.apache.syncope.core.persistence.api.ImplementationLookup;
+import org.apache.syncope.core.persistence.api.DomainHolder;
 import org.apache.syncope.core.persistence.api.content.ContentExporter;
 import org.apache.syncope.core.persistence.api.dao.AccessTokenDAO;
 import org.apache.syncope.core.persistence.api.dao.AnyObjectDAO;
@@ -42,6 +52,7 @@ import org.apache.syncope.core.persistence.api.dao.ExternalResourceDAO;
 import org.apache.syncope.core.persistence.api.dao.FIQLQueryDAO;
 import org.apache.syncope.core.persistence.api.dao.GroupDAO;
 import org.apache.syncope.core.persistence.api.dao.ImplementationDAO;
+import org.apache.syncope.core.persistence.api.dao.JobStatusDAO;
 import org.apache.syncope.core.persistence.api.dao.MailTemplateDAO;
 import org.apache.syncope.core.persistence.api.dao.NotificationDAO;
 import org.apache.syncope.core.persistence.api.dao.OIDCRPClientAppDAO;
@@ -51,7 +62,6 @@ import org.apache.syncope.core.persistence.api.dao.RealmDAO;
 import org.apache.syncope.core.persistence.api.dao.RelationshipTypeDAO;
 import org.apache.syncope.core.persistence.api.dao.ReportDAO;
 import org.apache.syncope.core.persistence.api.dao.ReportExecDAO;
-import org.apache.syncope.core.persistence.api.dao.ReportTemplateDAO;
 import org.apache.syncope.core.persistence.api.dao.RoleDAO;
 import org.apache.syncope.core.persistence.api.dao.SAML2SPClientAppDAO;
 import org.apache.syncope.core.persistence.api.dao.SecurityQuestionDAO;
@@ -65,6 +75,7 @@ import org.apache.syncope.core.persistence.api.entity.task.TaskUtilsFactory;
 import org.apache.syncope.core.provisioning.api.AnyObjectProvisioningManager;
 import org.apache.syncope.core.provisioning.api.AuditManager;
 import org.apache.syncope.core.provisioning.api.GroupProvisioningManager;
+import org.apache.syncope.core.provisioning.api.ImplementationLookup;
 import org.apache.syncope.core.provisioning.api.UserProvisioningManager;
 import org.apache.syncope.core.provisioning.api.data.AccessTokenDataBinder;
 import org.apache.syncope.core.provisioning.api.data.AnyObjectDataBinder;
@@ -98,14 +109,13 @@ import org.apache.syncope.core.workflow.api.AnyObjectWorkflowAdapter;
 import org.apache.syncope.core.workflow.api.GroupWorkflowAdapter;
 import org.apache.syncope.core.workflow.api.UserWorkflowAdapter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.scheduling.quartz.SchedulerFactoryBean;
 
 @EnableAspectJAutoProxy(proxyTargetClass = false)
-@EnableConfigurationProperties(LogicProperties.class)
 @Configuration(proxyBeanMethods = false)
 public class IdRepoLogicContext {
 
@@ -134,10 +144,29 @@ public class IdRepoLogicContext {
     @Bean
     public AuditLoader auditLoader(
             final AuditAccessor auditAccessor,
-            final ImplementationLookup implementationLookup,
-            final LogicProperties logicProperties) {
+            final ApplicationContext ctx) {
 
-        return new AuditLoader(auditAccessor, implementationLookup, logicProperties);
+        return new AuditLoader(auditAccessor, ctx);
+    }
+
+    @ConditionalOnMissingBean(name = "defaultAuditAppenders")
+    @Bean
+    public List<AuditAppender> defaultAuditAppenders(final DomainHolder domainHolder) {
+        List<AuditAppender> auditAppenders = new ArrayList<>();
+
+        LoggerContext logCtx = (LoggerContext) LogManager.getContext(false);
+        domainHolder.getDomains().forEach((domain, dataSource) -> {
+            AuditAppender appender = new JdbcAuditAppender(domain, dataSource);
+
+            LoggerConfig logConf = new LoggerConfig(AuditLoggerName.getAuditLoggerName(domain), null, false);
+            logConf.addAppender(appender.getTargetAppender(), Level.DEBUG, null);
+            logConf.setLevel(Level.DEBUG);
+            logCtx.getConfiguration().addLogger(logConf.getName(), logConf);
+
+            auditAppenders.add(appender);
+        });
+
+        return auditAppenders;
     }
 
     @ConditionalOnMissingBean
@@ -220,26 +249,26 @@ public class IdRepoLogicContext {
     @ConditionalOnMissingBean
     @Bean
     public AuditLogic auditLogic(
-            final AuditManager auditManager,
-            final AuditLoader auditLoader,
             final AuditConfDAO auditConfDAO,
             final ExternalResourceDAO externalResourceDAO,
             final EntityFactory entityFactory,
-            final AuditDataBinder binder) {
+            final AuditDataBinder binder,
+            final AuditManager auditManager,
+            final ApplicationContext ctx) {
 
         return new AuditLogic(
-                auditLoader,
                 auditConfDAO,
                 externalResourceDAO,
                 entityFactory,
                 binder,
-                auditManager);
+                auditManager,
+                ctx);
     }
 
     @ConditionalOnMissingBean
     @Bean
-    public CommandLogic commandLogic(final ImplementationDAO implementationDAO) {
-        return new CommandLogic(implementationDAO);
+    public CommandLogic commandLogic(final ImplementationDAO implementationDAO, final Validator validator) {
+        return new CommandLogic(implementationDAO, validator);
     }
 
     @ConditionalOnMissingBean
@@ -285,7 +314,6 @@ public class IdRepoLogicContext {
             final AnySearchDAO anySearchDAO,
             final SchedulerFactoryBean scheduler,
             final TaskDAO taskDAO,
-            final ConfParamOps confParamOps,
             final GroupDataBinder groupDataBinder,
             final TaskDataBinder taskDataBinder,
             final ImplementationDAO implementationDAO,
@@ -304,7 +332,6 @@ public class IdRepoLogicContext {
                 groupDataBinder,
                 provisioningManager,
                 taskDataBinder,
-                confParamOps,
                 jobManager,
                 scheduler,
                 entityFactory);
@@ -350,10 +377,11 @@ public class IdRepoLogicContext {
     public NotificationLogic notificationLogic(
             final NotificationDataBinder binder,
             final JobManager jobManager,
+            final JobStatusDAO jobStatusDAO,
             final SchedulerFactoryBean scheduler,
             final NotificationDAO notificationDAO) {
 
-        return new NotificationLogic(jobManager, scheduler, notificationDAO, binder);
+        return new NotificationLogic(jobManager, scheduler, jobStatusDAO, notificationDAO, binder);
     }
 
     @ConditionalOnMissingBean
@@ -404,24 +432,21 @@ public class IdRepoLogicContext {
     @Bean
     public ReportLogic reportLogic(
             final JobManager jobManager,
-            final ConfParamOps confParamOps,
             final ReportDataBinder binder,
             final SchedulerFactoryBean scheduler,
+            final JobStatusDAO jobStatusDAO,
             final ReportDAO reportDAO,
             final EntityFactory entityFactory,
             final ReportExecDAO reportExecDAO) {
 
-        return new ReportLogic(jobManager, scheduler, reportDAO, reportExecDAO, confParamOps, binder, entityFactory);
-    }
-
-    @ConditionalOnMissingBean
-    @Bean
-    public ReportTemplateLogic reportTemplateLogic(
-            final ReportTemplateDAO reportTemplateDAO,
-            final ReportDAO reportDAO,
-            final EntityFactory entityFactory) {
-
-        return new ReportTemplateLogic(reportTemplateDAO, reportDAO, entityFactory);
+        return new ReportLogic(
+                jobManager,
+                scheduler,
+                jobStatusDAO,
+                reportDAO,
+                reportExecDAO,
+                binder,
+                entityFactory);
     }
 
     @ConditionalOnMissingBean
@@ -490,7 +515,7 @@ public class IdRepoLogicContext {
             final TaskExecDAO taskExecDAO,
             final TaskDAO taskDAO,
             final SchedulerFactoryBean scheduler,
-            final ConfParamOps confParamOps,
+            final JobStatusDAO jobStatusDAO,
             final ExternalResourceDAO externalResourceDAO,
             final NotificationJobDelegate notificationJobDelegate,
             final TaskDataBinder taskDataBinder,
@@ -500,11 +525,11 @@ public class IdRepoLogicContext {
         return new TaskLogic(
                 jobManager,
                 scheduler,
+                jobStatusDAO,
                 taskDAO,
                 taskExecDAO,
                 externalResourceDAO,
                 notificationDAO,
-                confParamOps,
                 taskDataBinder,
                 taskExecutor,
                 notificationJobDelegate,

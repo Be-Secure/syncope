@@ -29,6 +29,7 @@ import org.apache.syncope.common.lib.to.PushTaskTO;
 import org.apache.syncope.common.lib.types.ConflictResolutionAction;
 import org.apache.syncope.common.lib.types.IdMImplementationType;
 import org.apache.syncope.common.lib.types.MappingPurpose;
+import org.apache.syncope.common.lib.types.TaskType;
 import org.apache.syncope.core.persistence.api.dao.ImplementationDAO;
 import org.apache.syncope.core.persistence.api.entity.Any;
 import org.apache.syncope.core.persistence.api.entity.AnyType;
@@ -44,6 +45,7 @@ import org.apache.syncope.core.provisioning.api.pushpull.SyncopePushResultHandle
 import org.apache.syncope.core.provisioning.api.pushpull.UserPushResultHandler;
 import org.apache.syncope.core.provisioning.api.pushpull.stream.SyncopeStreamPushExecutor;
 import org.apache.syncope.core.provisioning.java.pushpull.PushJobDelegate;
+import org.apache.syncope.core.provisioning.java.pushpull.PushResultHandlerDispatcher;
 import org.apache.syncope.core.spring.ApplicationContextProvider;
 import org.apache.syncope.core.spring.security.SecureRandomUtils;
 import org.quartz.JobExecutionException;
@@ -128,45 +130,51 @@ public class StreamPushJobDelegate extends PushJobDelegate implements SyncopeStr
 
         LOG.debug("Executing stream push as {}", executor);
 
+        taskType = TaskType.PUSH;
         try {
             ExternalResource resource = externalResource(anyType, columns, propagationActions);
 
-            PushTask pushTask = entityFactory.newEntity(PushTask.class);
-            pushTask.setResource(resource);
-            pushTask.setMatchingRule(pushTaskTO.getMatchingRule());
-            pushTask.setUnmatchingRule(pushTaskTO.getUnmatchingRule());
-            pushTask.setPerformCreate(true);
-            pushTask.setPerformUpdate(true);
-            pushTask.setPerformDelete(true);
-            pushTask.setSyncStatus(false);
+            task = entityFactory.newEntity(PushTask.class);
+            task.setResource(resource);
+            task.setMatchingRule(pushTaskTO.getMatchingRule());
+            task.setUnmatchingRule(pushTaskTO.getUnmatchingRule());
+            task.setPerformCreate(true);
+            task.setPerformUpdate(true);
+            task.setPerformDelete(true);
+            task.setSyncStatus(false);
 
-            profile = new ProvisioningProfile<>(connector, pushTask);
+            profile = new ProvisioningProfile<>(connector, task);
             profile.setExecutor(executor);
             profile.getActions().addAll(getPushActions(pushTaskTO.getActions().stream().
                     map(implementationDAO::find).filter(Objects::nonNull).collect(Collectors.toList())));
             profile.setConflictResolutionAction(ConflictResolutionAction.FIRSTMATCH);
 
+            PushResultHandlerDispatcher dispatcher = new PushResultHandlerDispatcher(profile, this);
+
             for (PushActions action : profile.getActions()) {
                 action.beforeAll(profile);
             }
 
-            SyncopePushResultHandler handler;
-            switch (anyType.getKind()) {
-                case USER:
-                    handler = buildUserHandler();
-                    break;
+            dispatcher.addHandlerSupplier(anyType.getKey(), () -> {
+                SyncopePushResultHandler handler;
+                switch (anyType.getKind()) {
+                    case USER:
+                        handler = buildUserHandler();
+                        break;
 
-                case GROUP:
-                    handler = buildGroupHandler();
-                    break;
+                    case GROUP:
+                        handler = buildGroupHandler();
+                        break;
 
-                case ANY_OBJECT:
-                default:
-                    handler = buildAnyObjectHandler();
-            }
-            handler.setProfile(profile);
+                    case ANY_OBJECT:
+                    default:
+                        handler = buildAnyObjectHandler();
+                }
+                handler.setProfile(profile);
+                return handler;
+            });
 
-            doHandle(anys, handler, resource);
+            doHandle(anys, dispatcher, resource);
 
             for (PushActions action : profile.getActions()) {
                 action.afterAll(profile);
@@ -177,6 +185,8 @@ public class StreamPushJobDelegate extends PushJobDelegate implements SyncopeStr
             throw e instanceof JobExecutionException
                     ? (JobExecutionException) e
                     : new JobExecutionException("While stream pushing", e);
+        } finally {
+            setStatus(null);
         }
     }
 }

@@ -27,7 +27,7 @@ import org.springframework.context.annotation.PropertySource;
 
 @Configuration(proxyBeanMethods = false)
 @PropertySource("classpath:wa.properties")
-@PropertySource(value = "file:${conf.directory}/wa.properties", ignoreResourceNotFound = true)
+@PropertySource(value = "file:${syncope.conf.dir}/wa.properties", ignoreResourceNotFound = true)
 public class WABootstrapConfiguration {
 
     @Configuration(proxyBeanMethods = false)
@@ -42,9 +42,12 @@ public class WABootstrapConfiguration {
         @Value("${wa.useGZIPCompression:true}")
         private boolean useGZIPCompression;
 
+        @Value("${service.discovery.address}")
+        private String serviceDiscoveryAddress;
+
         @Bean
         public WARestClient waRestClient() {
-            return new WARestClient(anonymousUser, anonymousKey, useGZIPCompression);
+            return new WARestClient(anonymousUser, anonymousKey, useGZIPCompression, serviceDiscoveryAddress);
         }
     }
 

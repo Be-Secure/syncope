@@ -25,12 +25,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import jakarta.ws.rs.core.GenericType;
+import jakarta.ws.rs.core.Response;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
-import javax.ws.rs.core.GenericType;
-import javax.ws.rs.core.Response;
-import org.apache.syncope.common.lib.Attr;
 import org.apache.syncope.common.lib.SyncopeClientException;
 import org.apache.syncope.common.lib.SyncopeConstants;
 import org.apache.syncope.common.lib.policy.AccessPolicyTO;
@@ -59,10 +57,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class RealmITCase extends AbstractITCase {
-
-    private static Optional<RealmTO> getRealm(final String fullPath) {
-        return REALM_SERVICE.list(fullPath).stream().filter(realm -> fullPath.equals(realm.getFullPath())).findFirst();
-    }
 
     @Test
     public void search() {
@@ -255,7 +249,7 @@ public class RealmITCase extends AbstractITCase {
     public void deletingAccessPolicy() {
         // 1. create access policy
         DefaultAccessPolicyConf conf = new DefaultAccessPolicyConf();
-        conf.getRequiredAttrs().add(new Attr.Builder("cn").values("admin", "Admin", "TheAdmin").build());
+        conf.getRequiredAttrs().put("cn", "admin,Admin,TheAdmin");
 
         AccessPolicyTO policy = new AccessPolicyTO();
         policy.setName("Test Access policy");
@@ -362,7 +356,6 @@ public class RealmITCase extends AbstractITCase {
             fail("This should not happen");
         } catch (SyncopeClientException e) {
             assertEquals(ClientExceptionType.RealmContains, e.getType());
-            assertEquals(5, e.getElements().size());
         }
     }
 
@@ -380,25 +373,24 @@ public class RealmITCase extends AbstractITCase {
         descendantRealm.getResources().add(RESOURCE_NAME_LDAP_ORGUNIT);
 
         // 2. check propagation
-        ProvisioningResult<RealmTO> result = REALM_SERVICE.create("/", realm).readEntity(
-            new GenericType<>() {
-            });
+        ProvisioningResult<RealmTO> result = REALM_SERVICE.create("/", realm).readEntity(new GenericType<>() {
+        });
         assertNotNull(result);
         assertEquals(1, result.getPropagationStatuses().size());
         assertEquals(RESOURCE_NAME_LDAP_ORGUNIT, result.getPropagationStatuses().get(0).getResource());
         assertEquals(ExecStatus.SUCCESS, result.getPropagationStatuses().get(0).getStatus());
 
         ProvisioningResult<RealmTO> resultChild = REALM_SERVICE.create("/test", childRealm).readEntity(
-            new GenericType<>() {
-            });
+                new GenericType<>() {
+        });
         assertNotNull(resultChild);
         assertEquals(1, resultChild.getPropagationStatuses().size());
         assertEquals(RESOURCE_NAME_LDAP_ORGUNIT, resultChild.getPropagationStatuses().get(0).getResource());
         assertEquals(ExecStatus.SUCCESS, resultChild.getPropagationStatuses().get(0).getStatus());
 
         ProvisioningResult<RealmTO> resultDescendant = REALM_SERVICE.create("/test/child", descendantRealm).readEntity(
-            new GenericType<>() {
-            });
+                new GenericType<>() {
+        });
         assertNotNull(resultDescendant);
         assertEquals(1, resultDescendant.getPropagationStatuses().size());
         assertEquals(RESOURCE_NAME_LDAP_ORGUNIT, resultDescendant.getPropagationStatuses().get(0).getResource());

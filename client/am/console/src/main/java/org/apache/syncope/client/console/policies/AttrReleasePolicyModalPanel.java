@@ -30,6 +30,7 @@ import org.apache.syncope.client.console.wicket.markup.html.form.MultiFieldPanel
 import org.apache.syncope.client.ui.commons.Constants;
 import org.apache.syncope.client.ui.commons.markup.html.form.AjaxCheckBoxPanel;
 import org.apache.syncope.client.ui.commons.markup.html.form.AjaxDropDownChoicePanel;
+import org.apache.syncope.client.ui.commons.markup.html.form.AjaxGridFieldPanel;
 import org.apache.syncope.client.ui.commons.markup.html.form.AjaxPalettePanel;
 import org.apache.syncope.client.ui.commons.markup.html.form.AjaxSpinnerFieldPanel;
 import org.apache.syncope.client.ui.commons.markup.html.form.AjaxTextFieldPanel;
@@ -47,7 +48,7 @@ import org.apache.wicket.model.PropertyModel;
 
 public class AttrReleasePolicyModalPanel extends AbstractModalPanel<AttrReleasePolicyTO> {
 
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 2668291404983623500L;
 
     private final IModel<List<String>> allAttrRepos = new LoadableDetachableModel<>() {
 
@@ -68,6 +69,10 @@ public class AttrReleasePolicyModalPanel extends AbstractModalPanel<AttrReleaseP
 
         super(modal, pageRef);
         this.model = model;
+
+        add(new AjaxGridFieldPanel<>(
+                "releaseAttrs", "releaseAttrs",
+                new PropertyModel<>(model.getObject().getConf(), "releaseAttrs")));
 
         AjaxTextFieldPanel allowedAttr = new AjaxTextFieldPanel("panel", "allowedAttrs", new Model<>());
         add(new MultiFieldPanel.Builder<String>(

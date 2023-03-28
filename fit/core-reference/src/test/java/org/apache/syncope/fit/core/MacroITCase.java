@@ -24,9 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import jakarta.ws.rs.core.Response;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
-import javax.ws.rs.core.Response;
 import org.apache.commons.io.IOUtils;
 import org.apache.syncope.common.lib.SyncopeClientException;
 import org.apache.syncope.common.lib.command.CommandTO;
@@ -56,6 +56,14 @@ import org.junit.jupiter.api.Test;
 public class MacroITCase extends AbstractITCase {
 
     private static String MACRO_TASK_KEY;
+
+    private static final TestCommandArgs TCA = new TestCommandArgs();
+
+    static {
+        TCA.setParentRealm("/odd");
+        TCA.setRealmName("macro");
+        TCA.setPrinterName("aprinter112");
+    }
 
     @BeforeAll
     public static void testCommandsSetup() throws Exception {
@@ -87,8 +95,7 @@ public class MacroITCase extends AbstractITCase {
             task.setActive(true);
             task.setRealm("/odd");
             task.getCommands().add(new CommandTO.Builder("GroovyCommand").build());
-            task.getCommands().add(new CommandTO.Builder(TestCommand.class.getSimpleName()).
-                    args(new TestCommandArgs()).build());
+            task.getCommands().add(new CommandTO.Builder(TestCommand.class.getSimpleName()).args(TCA).build());
 
             Response response = TASK_SERVICE.create(TaskType.MACRO, task);
             task = getObject(response.getLocation(), TaskService.class, MacroTaskTO.class);
@@ -124,10 +131,9 @@ public class MacroITCase extends AbstractITCase {
         ExecTO exec = TASK_SERVICE.read(TaskType.MACRO, MACRO_TASK_KEY, true).getExecutions().get(preExecs);
         assertEquals(ExecStatus.SUCCESS.name(), exec.getStatus());
 
-        TestCommandArgs args = new TestCommandArgs();
-        AnyObjectTO printer = ANY_OBJECT_SERVICE.read(args.getPrinterName());
+        AnyObjectTO printer = ANY_OBJECT_SERVICE.read(TCA.getPrinterName());
         assertNotNull(printer);
-        assertEquals(args.getParentRealm() + "/" + args.getRealmName(), printer.getRealm());
+        assertEquals(TCA.getParentRealm() + "/" + TCA.getRealmName(), printer.getRealm());
         assertFalse(REALM_SERVICE.list(printer.getRealm()).isEmpty());
     }
 

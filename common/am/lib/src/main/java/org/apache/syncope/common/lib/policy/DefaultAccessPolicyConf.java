@@ -18,31 +18,88 @@
  */
 package org.apache.syncope.common.lib.policy;
 
-import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
-import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
-import java.util.ArrayList;
-import java.util.List;
-import org.apache.syncope.common.lib.Attr;
+import io.swagger.v3.oas.annotations.media.Schema;
+import java.net.URI;
+import java.util.HashMap;
+import java.util.Map;
 
 public class DefaultAccessPolicyConf implements AccessPolicyConf {
 
     private static final long serialVersionUID = 1153200197344709778L;
 
-    private final List<Attr> requiredAttrs = new ArrayList<>();
+    private int order;
 
-    private final List<Attr> rejectedAttrs = new ArrayList<>();
+    private boolean enabled = true;
 
-    @JacksonXmlElementWrapper(localName = "requiredAttrs")
-    @JacksonXmlProperty(localName = "requiredAttr")
-    @Override
-    public List<Attr> getRequiredAttrs() {
+    private boolean ssoEnabled = true;
+
+    private boolean requireAllAttributes = true;
+
+    private boolean caseInsensitive;
+
+    private URI unauthorizedRedirectUrl;
+
+    @Schema(description =
+            "Insert comma-separated values in the right input field if you like to specify more than one value")
+    private final Map<String, String> requiredAttrs = new HashMap<>();
+
+    @Schema(description =
+            "Insert comma-separated values in the right input field if you like to specify more than one value")
+    private final Map<String, String> rejectedAttrs = new HashMap<>();
+
+    public int getOrder() {
+        return order;
+    }
+
+    public void setOrder(final int order) {
+        this.order = order;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(final boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public boolean isSsoEnabled() {
+        return this.ssoEnabled;
+    }
+
+    public void setSsoEnabled(final boolean ssoEnabled) {
+        this.ssoEnabled = ssoEnabled;
+    }
+
+    public boolean isRequireAllAttributes() {
+        return requireAllAttributes;
+    }
+
+    public void setRequireAllAttributes(final boolean requireAllAttributes) {
+        this.requireAllAttributes = requireAllAttributes;
+    }
+
+    public boolean isCaseInsensitive() {
+        return caseInsensitive;
+    }
+
+    public void setCaseInsensitive(final boolean caseInsensitive) {
+        this.caseInsensitive = caseInsensitive;
+    }
+
+    public URI getUnauthorizedRedirectUrl() {
+        return unauthorizedRedirectUrl;
+    }
+
+    public void setUnauthorizedRedirectUrl(final URI unauthorizedRedirectUrl) {
+        this.unauthorizedRedirectUrl = unauthorizedRedirectUrl;
+    }
+
+    public Map<String, String> getRequiredAttrs() {
         return requiredAttrs;
     }
 
-    @JacksonXmlElementWrapper(localName = "rejectedAttrs")
-    @JacksonXmlProperty(localName = "rejectedAttr")
-    @Override
-    public List<Attr> getRejectedAttrs() {
+    public Map<String, String> getRejectedAttrs() {
         return rejectedAttrs;
     }
 }

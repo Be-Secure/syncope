@@ -18,6 +18,15 @@
  */
 package org.apache.syncope.core.persistence.jpa.content;
 
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.Table;
+import jakarta.persistence.metamodel.Attribute;
+import jakarta.persistence.metamodel.EntityType;
+import jakarta.persistence.metamodel.PluralAttribute;
+import jakarta.xml.bind.DatatypeConverter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -49,17 +58,8 @@ import java.util.TreeSet;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import javax.persistence.CollectionTable;
-import javax.persistence.Column;
-import javax.persistence.EntityManagerFactory;
-import javax.persistence.JoinTable;
-import javax.persistence.Table;
-import javax.persistence.metamodel.Attribute;
-import javax.persistence.metamodel.EntityType;
-import javax.persistence.metamodel.PluralAttribute;
 import javax.sql.DataSource;
 import javax.xml.XMLConstants;
-import javax.xml.bind.DatatypeConverter;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerConfigurationException;
@@ -350,10 +350,10 @@ public class XMLContentExporter implements ContentExporter {
                     findFirst().
                     map(Map.Entry::getValue);
 
-            String outputTableName = entity.isPresent()
-                    ? entities.getKey(entity.get())
-                    : relationTables.keySet().stream().filter(tableName::equalsIgnoreCase).findFirst().
-                            orElse(tableName);
+            String outputTableName = entity.map(entities::getKey).
+                    orElseGet(() -> relationTables.keySet().stream().
+                    filter(tableName::equalsIgnoreCase).findFirst().
+                    orElse(tableName));
             if (isTask(tableName)) {
                 outputTableName = "Task";
             }
@@ -373,11 +373,9 @@ public class XMLContentExporter implements ContentExporter {
                     if (value != null && (!COLUMNS_TO_BE_NULLIFIED.containsKey(tableName)
                             || !COLUMNS_TO_BE_NULLIFIED.get(tableName).contains(columnName))) {
 
-                        String name = columnName;
-                        if (entity.isPresent()) {
-                            name = columnName(
-                                    () -> (Stream<Attribute<?, ?>>) entity.get().getAttributes().stream(), columnName);
-                        }
+                        String name = entity.map(e -> columnName(
+                                () -> (Stream<Attribute<?, ?>>) e.getAttributes().stream(), columnName)).
+                                orElse(columnName);
 
                         if (isTask(tableName)) {
                             name = columnName(

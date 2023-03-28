@@ -158,10 +158,6 @@ under the License.
           <resource>
             <directory>src/main/resources</directory>
             <filtering>true</filtering>
-            <excludes>
-              <exclude>workflow.properties</exclude>
-              <exclude>provisioning.properties</exclude>
-            </excludes>
           </resource>
           <resource>
             <directory>src/main/resources/all</directory>
@@ -210,6 +206,21 @@ under the License.
         </plugins>
       </build>
     </profile>
-  </profiles>
 
+    <profile>
+      <id>docker</id>
+
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-war-plugin</artifactId>
+            <configuration>
+              <attachClasses>true</attachClasses>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

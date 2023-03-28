@@ -18,7 +18,12 @@
  */
 package org.apache.syncope.client.console;
 
-import java.security.AccessControlException;
+import jakarta.ws.rs.BadRequestException;
+import jakarta.ws.rs.ForbiddenException;
+import jakarta.ws.rs.NotAuthorizedException;
+import jakarta.ws.rs.core.EntityTag;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.xml.ws.WebServiceException;
 import java.text.DateFormat;
 import java.util.Collections;
 import java.util.HashMap;
@@ -30,11 +35,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
-import javax.ws.rs.BadRequestException;
-import javax.ws.rs.ForbiddenException;
-import javax.ws.rs.core.EntityTag;
-import javax.ws.rs.core.MediaType;
-import javax.xml.ws.WebServiceException;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
@@ -63,6 +63,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.util.CollectionUtils;
 
 public class SyncopeConsoleSession extends AuthenticatedWebSession implements BaseSession {
 
@@ -147,12 +148,11 @@ public class SyncopeConsoleSession extends AuthenticatedWebSession implements Ba
         Throwable root = ExceptionUtils.getRootCause(e);
         String message = root.getMessage();
 
-        if (root instanceof SyncopeClientException) {
-            SyncopeClientException sce = (SyncopeClientException) root;
+        if (root instanceof SyncopeClientException sce) {
             message = sce.isComposite()
                     ? sce.asComposite().getExceptions().stream().map(this::message).collect(Collectors.joining("; "))
                     : message(sce);
-        } else if (root instanceof AccessControlException || root instanceof ForbiddenException) {
+        } else if (root instanceof NotAuthorizedException || root instanceof ForbiddenException) {
             Error error = StringUtils.containsIgnoreCase(message, "expired")
                     ? Error.SESSION_EXPIRED
                     : Error.AUTHORIZATION;
@@ -287,7 +287,7 @@ public class SyncopeConsoleSession extends AuthenticatedWebSession implements Ba
 
     public List<String> getSearchableRealms() {
         Set<String> roots = auth.get(IdRepoEntitlement.REALM_LIST);
-        return roots.isEmpty()
+        return CollectionUtils.isEmpty(roots)
                 ? List.of()
                 : roots.stream().sorted().collect(Collectors.toList());
     }

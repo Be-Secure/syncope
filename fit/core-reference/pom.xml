@@ -24,7 +24,7 @@ under the License.
   <parent>
     <groupId>org.apache.syncope</groupId>
     <artifactId>syncope-fit</artifactId>
-    <version>3.0.0-SNAPSHOT</version>
+    <version>4.0.0-SNAPSHOT</version>
   </parent>
 
   <name>Apache Syncope FIT Core Reference</name>
@@ -274,15 +274,13 @@ under the License.
         <inherited>true</inherited>
         <configuration>
           <container>
-            <containerId>tomcat9x</containerId>
+            <containerId>tomcat10x</containerId>
             <zipUrlInstaller>
               <url>https://repo1.maven.org/maven2/org/apache/tomcat/tomcat/${tomcat.version}/tomcat-${tomcat.version}.zip</url>
               <downloadDir>${settings.localRepository}/org/codehaus/cargo/cargo-container-archives</downloadDir>
               <extractDir>${project.build.directory}/cargo/extract</extractDir>
             </zipUrlInstaller>
             <timeout>300000</timeout>
-            <log>${cargo.log}</log>
-            <output>${cargo.output}</output>
             <systemProperties>
               <java.security.egd>file:/dev/./urandom</java.security.egd>
               <java.util.secureRandomSeed>true</java.util.secureRandomSeed>
@@ -381,6 +379,7 @@ under the License.
         <filtering>true</filtering>
         <excludes>
           <exclude>saml.keystore.jks</exclude>
+          <exclude>test.pdf</exclude>
         </excludes>
       </testResource>
       <testResource>
@@ -388,6 +387,7 @@ under the License.
         <filtering>false</filtering>
         <includes>
           <include>saml.keystore.jks</include>
+          <include>test.pdf</include>
         </includes>
       </testResource>
       <testResource>
@@ -469,14 +469,16 @@ under the License.
             <directory>src/test/resources</directory>
             <filtering>true</filtering>
             <excludes>
-              <exclude>keystore</exclude>
+              <exclude>saml.keystore.jks</exclude>
+              <exclude>test.pdf</exclude>
             </excludes>
           </testResource>
           <testResource>
             <directory>src/test/resources</directory>
             <filtering>false</filtering>
             <includes>
-              <include>keystore</include>
+              <include>saml.keystore.jks</include>
+              <include>test.pdf</include>
             </includes>
           </testResource>
           <testResource>
@@ -495,6 +497,11 @@ under the License.
       </properties>
 
       <dependencies>
+        <dependency>
+          <groupId>org.apache.syncope.ext.elasticsearch</groupId>
+          <artifactId>syncope-ext-elasticsearch-logic</artifactId>
+          <version>${project.version}</version>
+        </dependency>
         <dependency>
           <groupId>org.apache.syncope.ext.elasticsearch</groupId>
           <artifactId>syncope-ext-elasticsearch-provisioning-java</artifactId>
@@ -533,6 +540,7 @@ under the License.
                       <cluster.name>elasticsearch</cluster.name>
                       <xpack.security.enabled>false</xpack.security.enabled>
                       <ingest.geoip.downloader.enabled>false</ingest.geoip.downloader.enabled>
+                      <ES_JAVA_OPTS>-Xms750m -Xmx750m</ES_JAVA_OPTS>
                     </env>
                     <ports>
                       <port>9200:9200</port>
@@ -573,14 +581,16 @@ under the License.
             <directory>src/test/resources</directory>
             <filtering>true</filtering>
             <excludes>
-              <exclude>keystore</exclude>
+              <exclude>saml.keystore.jks</exclude>
+              <exclude>test.pdf</exclude>
             </excludes>
           </testResource>
           <testResource>
             <directory>src/test/resources</directory>
             <filtering>false</filtering>
             <includes>
-              <include>keystore</include>
+              <include>saml.keystore.jks</include>
+              <include>test.pdf</include>
             </includes>
           </testResource>
           <testResource>
@@ -724,16 +734,6 @@ under the License.
           <groupId>org.postgresql</groupId>
           <artifactId>postgresql</artifactId>
           <version>${jdbc.postgresql.version}</version>
-          <scope>test</scope>
-        </dependency>
-        <dependency>
-          <groupId>org.bouncycastle</groupId>
-          <artifactId>bcpkix-jdk15on</artifactId>
-          <scope>test</scope>
-        </dependency>
-        <dependency>
-          <groupId>org.bouncycastle</groupId>
-          <artifactId>bcprov-jdk15on</artifactId>
           <scope>test</scope>
         </dependency>
       </dependencies>
@@ -946,16 +946,6 @@ under the License.
           <groupId>com.mysql</groupId>
           <artifactId>mysql-connector-j</artifactId>
           <version>${jdbc.mysql.version}</version>
-          <scope>test</scope>
-        </dependency>
-        <dependency>
-          <groupId>org.bouncycastle</groupId>
-          <artifactId>bcpkix-jdk15on</artifactId>
-          <scope>test</scope>
-        </dependency>
-        <dependency>
-          <groupId>org.bouncycastle</groupId>
-          <artifactId>bcprov-jdk15on</artifactId>
           <scope>test</scope>
         </dependency>
       </dependencies>
@@ -1445,18 +1435,12 @@ under the License.
           <groupId>org.apache.syncope.core</groupId>
           <artifactId>syncope-core-persistence-jpa</artifactId>
           <version>${project.version}</version>
-          <exclusions>
-            <exclusion>
-              <groupId>org.apache.bval</groupId>
-              <artifactId>bval-jsr</artifactId>
-            </exclusion>
-          </exclusions>
         </dependency>
 
         <dependency>
           <groupId>org.glassfish</groupId>
           <artifactId>jakarta.faces</artifactId>
-          <version>${javax.faces.version}</version>
+          <version>${jakarta.faces.version}</version>
         </dependency>
       </dependencies>
 
@@ -1476,8 +1460,7 @@ under the License.
                   <target>
                     <unzip src="${settings.localRepository}/org/apache/syncope/fit/syncope-fit-build-tools/${project.version}/syncope-fit-build-tools-${project.version}.war"
                            dest="${project.build.outputDirectory}/syncope-fit-buildtools"/>
-                    <delete file="${project.build.outputDirectory}/syncope-fit-buildtools/WEB-INF/lib/bval-jsr-${bval.version}.jar"/>
-                    <copy file="${settings.localRepository}/org/glassfish/jakarta.faces/${javax.faces.version}/jakarta.faces-${javax.faces.version}.jar"
+                    <copy file="${settings.localRepository}/org/glassfish/jakarta.faces/${jakarta.faces.version}/jakarta.faces-${jakarta.faces.version}.jar"
                           todir="${project.build.outputDirectory}/syncope-fit-buildtools/WEB-INF/lib"/>
                   </target>
                 </configuration>
@@ -1500,14 +1483,13 @@ under the License.
                   <downloadDir>${settings.localRepository}/org/codehaus/cargo/cargo-container-archives</downloadDir>
                   <extractDir>${project.build.directory}/cargo/extract</extractDir>
                 </zipUrlInstaller>
-                <log>${cargo.log}</log>
-                <output>${cargo.output}</output>
               </container>
               <configuration>
                 <properties>
                   <cargo.glassfish.removeDefaultDatasource>false</cargo.glassfish.removeDefaultDatasource>
                   <cargo.jvmargs>-Dspring.profiles.active=embedded,payara
-                    -XX:+UseG1GC -Xmx2048m -Xms1024m</cargo.jvmargs>
+                    -XX:+UseG1GC -Xmx2048m -Xms1024m
+                    --add-exports=java.naming/com.sun.jndi.ldap=ALL-UNNAMED</cargo.jvmargs>
                 </properties>
               </configuration>
               <deployables>
@@ -1598,19 +1580,19 @@ under the License.
             <inherited>true</inherited>
             <configuration>
               <container>
-                <containerId>wildfly26x</containerId>
+                <containerId>wildfly27x</containerId>
                 <zipUrlInstaller>
                   <url>https://github.com/wildfly/wildfly/releases/download/${wildfly.version}/wildfly-${wildfly.version}.zip</url>
                   <downloadDir>${settings.localRepository}/org/codehaus/cargo/cargo-container-archives</downloadDir>
                   <extractDir>${project.build.directory}/cargo/extract</extractDir>
                 </zipUrlInstaller>
-                <log>${cargo.log}</log>
-                <output>${cargo.output}</output>
               </container>
               <configuration>
                 <properties>
                   <cargo.jvmargs>-Djava.net.preferIPv4Stack=true -Dspring.profiles.active=embedded,wildfly
-                    -XX:+UseG1GC -Xmx2048m -Xms1024m</cargo.jvmargs>
+                    -XX:+UseG1GC -Xmx2048m -Xms1024m
+                    --add-opens java.base/java.util=ALL-UNNAMED
+                    --add-exports=java.naming/com.sun.jndi.ldap=ALL-UNNAMED</cargo.jvmargs>
                 </properties>
               </configuration>
             </configuration>

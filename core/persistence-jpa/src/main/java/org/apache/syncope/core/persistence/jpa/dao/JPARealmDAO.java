@@ -18,11 +18,10 @@
  */
 package org.apache.syncope.core.persistence.jpa.dao;
 
+import jakarta.persistence.NoResultException;
+import jakarta.persistence.TypedQuery;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
-import javax.persistence.NoResultException;
-import javax.persistence.TypedQuery;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.syncope.common.lib.SyncopeConstants;
 import org.apache.syncope.core.persistence.api.dao.MalformedPathException;
@@ -39,6 +38,7 @@ import org.apache.syncope.core.persistence.api.entity.policy.PasswordPolicy;
 import org.apache.syncope.core.persistence.api.entity.policy.Policy;
 import org.apache.syncope.core.persistence.api.entity.policy.PropagationPolicy;
 import org.apache.syncope.core.persistence.api.entity.policy.ProvisioningPolicy;
+import org.apache.syncope.core.persistence.api.entity.policy.TicketExpirationPolicy;
 import org.apache.syncope.core.persistence.jpa.entity.JPARealm;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -88,12 +88,11 @@ public class JPARealmDAO extends AbstractDAO<Realm> implements RealmDAO {
         }
 
         Realm current = root;
-        for (final String pathElement : fullPath.substring(1).split("/")) {
-            Optional<Realm> first = findChildren(current).stream().
-                    filter(realm -> pathElement.equals(realm.getName())).findFirst();
-            if (first.isPresent()) {
-                current = first.get();
-            } else {
+        for (String pathElement : fullPath.substring(1).split("/")) {
+            current = findChildren(current).stream().
+                    filter(realm -> pathElement.equals(realm.getName())).findFirst().
+                    orElse(null);
+            if (current == null) {
                 return null;
             }
         }
@@ -160,6 +159,8 @@ public class JPARealmDAO extends AbstractDAO<Realm> implements RealmDAO {
             policyColumn = "accessPolicy";
         } else if (policy instanceof AttrReleasePolicy) {
             policyColumn = "attrReleasePolicy";
+        } else if (policy instanceof TicketExpirationPolicy) {
+            policyColumn = "ticketExpirationPolicy";
         }
 
         TypedQuery<Realm> query = entityManager().createQuery(

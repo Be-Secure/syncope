@@ -18,12 +18,12 @@
  */
 package org.apache.syncope.fit.buildtools.cxf;
 
+import jakarta.ws.rs.ext.ParamConverter;
+import jakarta.ws.rs.ext.ParamConverterProvider;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
 import java.util.Date;
-import javax.ws.rs.ext.ParamConverter;
-import javax.ws.rs.ext.ParamConverterProvider;
-import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.StringUtils;
 
 public class DateParamConverterProvider implements ParamConverterProvider {
 
@@ -31,11 +31,11 @@ public class DateParamConverterProvider implements ParamConverterProvider {
 
         @Override
         public Date fromString(final String value) {
-            if (StringUtils.isBlank(value)) {
+            if (!StringUtils.hasText(value)) {
                 return null;
             }
             try {
-                return new Date(Long.valueOf(value));
+                return new Date(Long.parseLong(value));
             } catch (final NumberFormatException e) {
                 throw new IllegalArgumentException("Unparsable date: " + value, e);
             }

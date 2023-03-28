@@ -26,6 +26,7 @@ import org.apache.syncope.common.lib.to.ProvisioningReport;
 import org.apache.syncope.common.lib.to.PushTaskTO;
 import org.apache.syncope.common.lib.types.ConflictResolutionAction;
 import org.apache.syncope.common.lib.types.MatchingRule;
+import org.apache.syncope.common.lib.types.TaskType;
 import org.apache.syncope.common.lib.types.UnmatchingRule;
 import org.apache.syncope.core.persistence.api.dao.ImplementationDAO;
 import org.apache.syncope.core.persistence.api.entity.Any;
@@ -55,18 +56,20 @@ public class SinglePushJobDelegate extends PushJobDelegate implements SyncopeSin
 
         LOG.debug("Executing push on {}", resource);
 
-        PushTask pushTask = entityFactory.newEntity(PushTask.class);
-        pushTask.setResource(resource);
-        pushTask.setMatchingRule(pushTaskTO.getMatchingRule() == null
-                ? MatchingRule.LINK : pushTaskTO.getMatchingRule());
-        pushTask.setUnmatchingRule(pushTaskTO.getUnmatchingRule() == null
-                ? UnmatchingRule.ASSIGN : pushTaskTO.getUnmatchingRule());
-        pushTask.setPerformCreate(pushTaskTO.isPerformCreate());
-        pushTask.setPerformUpdate(pushTaskTO.isPerformUpdate());
-        pushTask.setPerformDelete(pushTaskTO.isPerformDelete());
-        pushTask.setSyncStatus(pushTaskTO.isSyncStatus());
+        taskType = TaskType.PUSH;
 
-        profile = new ProvisioningProfile<>(connector, pushTask);
+        task = entityFactory.newEntity(PushTask.class);
+        task.setResource(resource);
+        task.setMatchingRule(pushTaskTO.getMatchingRule() == null
+                ? MatchingRule.LINK : pushTaskTO.getMatchingRule());
+        task.setUnmatchingRule(pushTaskTO.getUnmatchingRule() == null
+                ? UnmatchingRule.ASSIGN : pushTaskTO.getUnmatchingRule());
+        task.setPerformCreate(pushTaskTO.isPerformCreate());
+        task.setPerformUpdate(pushTaskTO.isPerformUpdate());
+        task.setPerformDelete(pushTaskTO.isPerformDelete());
+        task.setSyncStatus(pushTaskTO.isSyncStatus());
+
+        profile = new ProvisioningProfile<>(connector, task);
         profile.setExecutor(executor);
         profile.getActions().addAll(getPushActions(pushTaskTO.getActions().stream().
                 map(implementationDAO::find).filter(Objects::nonNull).collect(Collectors.toList())));
@@ -88,26 +91,30 @@ public class SinglePushJobDelegate extends PushJobDelegate implements SyncopeSin
 
         try {
             before(resource, connector, pushTaskTO, executor);
+            PushResultHandlerDispatcher dispatcher = new PushResultHandlerDispatcher(profile, this);
 
             AnyType anyType = anyTypeDAO.find(provision.getAnyType());
 
-            SyncopePushResultHandler handler;
-            switch (anyType.getKind()) {
-                case USER:
-                    handler = buildUserHandler();
-                    break;
+            dispatcher.addHandlerSupplier(provision.getAnyType(), () -> {
+                SyncopePushResultHandler handler;
+                switch (anyType.getKind()) {
+                    case USER:
+                        handler = buildUserHandler();
+                        break;
 
-                case GROUP:
-                    handler = buildGroupHandler();
-                    break;
+                    case GROUP:
+                        handler = buildGroupHandler();
+                        break;
 
-                case ANY_OBJECT:
-                default:
-                    handler = buildAnyObjectHandler();
-            }
-            handler.setProfile(profile);
+                    case ANY_OBJECT:
+                    default:
+                        handler = buildAnyObjectHandler();
+                }
+                handler.setProfile(profile);
+                return handler;
+            });
 
-            doHandle(List.of(any), handler, resource);
+            doHandle(List.of(any), dispatcher, resource);
 
             for (PushActions action : profile.getActions()) {
                 action.afterAll(profile);
@@ -118,6 +125,8 @@ public class SinglePushJobDelegate extends PushJobDelegate implements SyncopeSin
             throw e instanceof JobExecutionException
                     ? (JobExecutionException) e
                     : new JobExecutionException("While pushing to connector", e);
+        } finally {
+            setStatus(null);
         }
     }
 
@@ -147,6 +156,8 @@ public class SinglePushJobDelegate extends PushJobDelegate implements SyncopeSin
             throw e instanceof JobExecutionException
                     ? (JobExecutionException) e
                     : new JobExecutionException("While pushing to connector", e);
+        } finally {
+            setStatus(null);
         }
     }
 }

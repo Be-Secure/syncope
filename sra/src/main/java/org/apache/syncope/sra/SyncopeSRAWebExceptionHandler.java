@@ -41,6 +41,7 @@ import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.security.oauth2.core.OAuth2AuthorizationException;
+import org.springframework.util.MimeTypeUtils;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebExceptionHandler;
 import reactor.core.publisher.Mono;
@@ -71,14 +72,12 @@ public class SyncopeSRAWebExceptionHandler implements WebExceptionHandler, Appli
         String routeId = exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_PREDICATE_ROUTE_ATTR);
         if (StringUtils.isNotBlank(routeId)) {
             Optional<URI> routeError = Optional.ofNullable(CACHE.get(routeId)).orElseGet(() -> {
-                URI uri = null;
                 Optional<SRARouteTO> route = routeProvider.getRouteTOs().stream().
                         filter(r -> routeId.equals(r.getKey())).findFirst();
-                if (route.isPresent()) {
-                    uri = route.get().getError();
-                }
+                URI uri = route.map(SRARouteTO::getError).orElse(null);
 
-                return CACHE.put(routeId, Optional.ofNullable(uri));
+                CACHE.put(routeId, Optional.ofNullable(uri));
+                return CACHE.get(routeId);
             });
             if (routeError.isPresent()) {
                 error = routeError.get();
@@ -92,7 +91,7 @@ public class SyncopeSRAWebExceptionHandler implements WebExceptionHandler, Appli
         try {
             List<MediaType> acceptedMediaTypes = request.getHeaders().getAccept();
             acceptedMediaTypes.remove(MediaType.ALL);
-            MediaType.sortBySpecificityAndQuality(acceptedMediaTypes);
+            MimeTypeUtils.sortBySpecificity(acceptedMediaTypes);
             return acceptedMediaTypes.stream().anyMatch(MediaType.TEXT_HTML::isCompatibleWith);
         } catch (InvalidMediaTypeException e) {
             LOG.debug("Unexpected exception", e);

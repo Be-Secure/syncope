@@ -18,7 +18,7 @@
  */
 package org.apache.syncope.core.starter;
 
-import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
+import com.fasterxml.jackson.jakarta.rs.json.JacksonJsonProvider;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -93,9 +93,11 @@ public class SelfKeymasterContext {
 
     @Conditional(SelfKeymasterCondition.class)
     @Bean
-    public Server selfKeymasterContainer(final JacksonJsonProvider jsonProvider,
-                                         final ApplicationContext ctx,
-                                         final Bus bus) {
+    public Server selfKeymasterContainer(
+            final JacksonJsonProvider jsonProvider,
+            final ApplicationContext ctx,
+            final Bus bus) {
+
         SpringJAXRSServerFactoryBean selfKeymasterContainer = new SpringJAXRSServerFactoryBean();
         selfKeymasterContainer.setBus(bus);
         selfKeymasterContainer.setAddress("/keymaster");

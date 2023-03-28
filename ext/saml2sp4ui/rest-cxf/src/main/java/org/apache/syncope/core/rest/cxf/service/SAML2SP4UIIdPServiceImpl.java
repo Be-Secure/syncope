@@ -18,9 +18,9 @@
  */
 package org.apache.syncope.core.rest.cxf.service;
 
+import jakarta.ws.rs.core.Response;
 import java.io.InputStream;
 import java.util.List;
-import javax.ws.rs.core.Response;
 import org.apache.syncope.common.lib.to.SAML2SP4UIIdPTO;
 import org.apache.syncope.common.rest.api.RESTHeaders;
 import org.apache.syncope.common.rest.api.service.SAML2SP4UIIdPService;
@@ -48,7 +48,8 @@ public class SAML2SP4UIIdPServiceImpl extends AbstractService implements SAML2SP
 
     @Override
     public Response importFromMetadata(final InputStream input) {
-        return Response.ok().header(RESTHeaders.RESOURCE_KEY, logic.importFromMetadata(input)).build();
+        return Response.status(Response.Status.CREATED).
+                header(RESTHeaders.RESOURCE_KEY, logic.importFromMetadata(input)).build();
     }
 
     @Override

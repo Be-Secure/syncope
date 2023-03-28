@@ -18,16 +18,17 @@
  */
 package org.apache.syncope.core.rest.cxf;
 
-import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
-import com.fasterxml.jackson.jaxrs.xml.JacksonXMLProvider;
-import com.fasterxml.jackson.jaxrs.yaml.JacksonYAMLProvider;
+import com.fasterxml.jackson.jakarta.rs.json.JacksonJsonProvider;
+import com.fasterxml.jackson.jakarta.rs.xml.JacksonXMLProvider;
+import com.fasterxml.jackson.jakarta.rs.yaml.JacksonYAMLProvider;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import jakarta.validation.Validator;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadPoolExecutor;
-import javax.servlet.ServletRequestListener;
 import org.apache.cxf.Bus;
 import org.apache.cxf.endpoint.Server;
 import org.apache.cxf.jaxrs.ext.ContextProvider;
@@ -35,6 +36,8 @@ import org.apache.cxf.jaxrs.ext.search.SearchContext;
 import org.apache.cxf.jaxrs.ext.search.SearchContextImpl;
 import org.apache.cxf.jaxrs.ext.search.SearchContextProvider;
 import org.apache.cxf.jaxrs.ext.search.SearchUtils;
+import org.apache.cxf.jaxrs.model.doc.JavaDocProvider;
+import org.apache.cxf.jaxrs.openapi.OpenApiCustomizer;
 import org.apache.cxf.jaxrs.openapi.OpenApiFeature;
 import org.apache.cxf.jaxrs.spring.JAXRSServerFactoryBeanDefinitionParser.SpringJAXRSServerFactoryBean;
 import org.apache.cxf.jaxrs.validation.JAXRSBeanValidationInInterceptor;
@@ -64,7 +67,6 @@ import org.apache.syncope.common.rest.api.service.PolicyService;
 import org.apache.syncope.common.rest.api.service.RealmService;
 import org.apache.syncope.common.rest.api.service.RelationshipTypeService;
 import org.apache.syncope.common.rest.api.service.ReportService;
-import org.apache.syncope.common.rest.api.service.ReportTemplateService;
 import org.apache.syncope.common.rest.api.service.RoleService;
 import org.apache.syncope.common.rest.api.service.SchemaService;
 import org.apache.syncope.common.rest.api.service.SecurityQuestionService;
@@ -90,7 +92,6 @@ import org.apache.syncope.core.logic.PolicyLogic;
 import org.apache.syncope.core.logic.RealmLogic;
 import org.apache.syncope.core.logic.RelationshipTypeLogic;
 import org.apache.syncope.core.logic.ReportLogic;
-import org.apache.syncope.core.logic.ReportTemplateLogic;
 import org.apache.syncope.core.logic.RoleLogic;
 import org.apache.syncope.core.logic.SchemaLogic;
 import org.apache.syncope.core.logic.SecurityQuestionLogic;
@@ -122,7 +123,6 @@ import org.apache.syncope.core.rest.cxf.service.PolicyServiceImpl;
 import org.apache.syncope.core.rest.cxf.service.RealmServiceImpl;
 import org.apache.syncope.core.rest.cxf.service.RelationshipTypeServiceImpl;
 import org.apache.syncope.core.rest.cxf.service.ReportServiceImpl;
-import org.apache.syncope.core.rest.cxf.service.ReportTemplateServiceImpl;
 import org.apache.syncope.core.rest.cxf.service.RoleServiceImpl;
 import org.apache.syncope.core.rest.cxf.service.SchemaServiceImpl;
 import org.apache.syncope.core.rest.cxf.service.SecurityQuestionServiceImpl;
@@ -130,9 +130,11 @@ import org.apache.syncope.core.rest.cxf.service.SyncopeServiceImpl;
 import org.apache.syncope.core.rest.cxf.service.TaskServiceImpl;
 import org.apache.syncope.core.rest.cxf.service.UserSelfServiceImpl;
 import org.apache.syncope.core.rest.cxf.service.UserServiceImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.boot.web.servlet.ServletListenerRegistrationBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -145,7 +147,8 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 @Configuration(proxyBeanMethods = false)
 public class IdRepoRESTCXFContext {
 
-    @ConditionalOnMissingBean
+    private static final Logger LOG = LoggerFactory.getLogger(IdRepoRESTCXFContext.class);
+
     @Bean
     public ThreadPoolTaskExecutor batchExecutor(final RESTProperties props) {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
@@ -186,15 +189,15 @@ public class IdRepoRESTCXFContext {
 
     @ConditionalOnMissingBean
     @Bean
-    public BeanValidationProvider validationProvider() {
-        return new BeanValidationProvider();
+    public MDCInInterceptor mdcInInterceptor() {
+        return new MDCInInterceptor();
     }
 
     @ConditionalOnMissingBean
     @Bean
-    public JAXRSBeanValidationInInterceptor validationInInterceptor(final BeanValidationProvider validationProvider) {
+    public JAXRSBeanValidationInInterceptor validationInInterceptor(final Validator validator) {
         JAXRSBeanValidationInInterceptor validationInInterceptor = new JAXRSBeanValidationInInterceptor();
-        validationInInterceptor.setProvider(validationProvider);
+        validationInInterceptor.setProvider(new BeanValidationProvider(validator));
         return validationInInterceptor;
     }
 
@@ -211,6 +214,12 @@ public class IdRepoRESTCXFContext {
         gzipOutInterceptor.setThreshold(0);
         gzipOutInterceptor.setForce(true);
         return gzipOutInterceptor;
+    }
+
+    @ConditionalOnMissingBean
+    @Bean
+    public ThreadLocalCleanupOutInterceptor threadLocalCleanupOutInterceptor() {
+        return new ThreadLocalCleanupOutInterceptor();
     }
 
     @ConditionalOnMissingBean
@@ -243,11 +252,38 @@ public class IdRepoRESTCXFContext {
         return new AddETagFilter();
     }
 
+    @ConditionalOnMissingBean(name = { "openApiCustomizer", "syncopeOpenApiCustomizer" })
+    @Bean
+    public OpenApiCustomizer openApiCustomizer(final DomainHolder domainHolder, final Environment env) {
+        JavaDocProvider javaDocProvider = null;
+
+        URL[] javaDocURLs = JavaDocUtils.getJavaDocURLs();
+        if (javaDocURLs == null) {
+            String[] javaDocPaths = JavaDocUtils.getJavaDocPaths(env);
+            if (javaDocPaths != null) {
+                try {
+                    javaDocProvider = new JavaDocProvider(javaDocPaths);
+                } catch (Exception e) {
+                    LOG.error("Could not set javadoc paths from {}", List.of(javaDocPaths), e);
+                }
+            }
+        } else {
+            javaDocProvider = new JavaDocProvider(javaDocURLs);
+        }
+
+        SyncopeOpenApiCustomizer openApiCustomizer = new SyncopeOpenApiCustomizer(domainHolder);
+        openApiCustomizer.setDynamicBasePath(false);
+        openApiCustomizer.setReplaceTags(false);
+        openApiCustomizer.setJavadocProvider(javaDocProvider);
+        return openApiCustomizer;
+    }
+
     @ConditionalOnMissingBean
     @Bean
-    public OpenApiFeature openapiFeature(final ApplicationContext ctx) {
+    public OpenApiFeature openapiFeature(final OpenApiCustomizer openApiCustomizer, final ApplicationContext ctx) {
         String version = ctx.getEnvironment().getProperty("version");
         OpenApiFeature openapiFeature = new OpenApiFeature();
+        openapiFeature.setUseContextBasedConfig(true);
         openapiFeature.setTitle("Apache Syncope");
         openapiFeature.setVersion(version);
         openapiFeature.setDescription("Apache Syncope " + version);
@@ -256,10 +292,6 @@ public class IdRepoRESTCXFContext {
         openapiFeature.setContactUrl("https://syncope.apache.org");
         openapiFeature.setScan(false);
         openapiFeature.setResourcePackages(Set.of("org.apache.syncope.common.rest.api.service"));
-
-        SyncopeOpenApiCustomizer openApiCustomizer = new SyncopeOpenApiCustomizer(ctx.getEnvironment());
-        openApiCustomizer.setDynamicBasePath(false);
-        openApiCustomizer.setReplaceTags(false);
         openapiFeature.setCustomizer(openApiCustomizer);
 
         Map<String, SecurityScheme> securityDefinitions = new HashMap<>();
@@ -287,9 +319,11 @@ public class IdRepoRESTCXFContext {
             final JacksonXMLProvider xmlProvider,
             final JacksonJsonProvider jsonProvider,
             final DateParamConverterProvider dateParamConverterProvider,
+            final MDCInInterceptor mdcInInterceptor,
             final JAXRSBeanValidationInInterceptor validationInInterceptor,
             final GZIPInInterceptor gzipInInterceptor,
             final GZIPOutInterceptor gzipOutInterceptor,
+            final ThreadLocalCleanupOutInterceptor threadLocalCleanupOutInterceptor,
             final OpenApiFeature openapiFeature,
             final Bus bus,
             final ApplicationContext ctx,
@@ -321,24 +355,14 @@ public class IdRepoRESTCXFContext {
                 addDomainFilter,
                 addETagFilter));
 
-        restContainer.setInInterceptors(List.of(
-                gzipInInterceptor,
-                validationInInterceptor));
+        restContainer.setInInterceptors(List.of(mdcInInterceptor, validationInInterceptor, gzipInInterceptor));
 
-        restContainer.setOutInterceptors(List.of(gzipOutInterceptor));
+        restContainer.setOutInterceptors(List.of(gzipOutInterceptor, threadLocalCleanupOutInterceptor));
 
         restContainer.setFeatures(List.of(openapiFeature));
 
         restContainer.setApplicationContext(ctx);
         return restContainer.create();
-    }
-
-    @ConditionalOnMissingBean
-    @Bean
-    public ServletListenerRegistrationBean<ServletRequestListener> listenerRegistrationBean() {
-        ServletListenerRegistrationBean<ServletRequestListener> bean = new ServletListenerRegistrationBean<>();
-        bean.setListener(new ThreadLocalCleanupListener());
-        return bean;
     }
 
     @ConditionalOnMissingBean
@@ -453,12 +477,6 @@ public class IdRepoRESTCXFContext {
 
     @ConditionalOnMissingBean
     @Bean
-    public ReportTemplateService reportTemplateService(final ReportTemplateLogic reportTemplateLogic) {
-        return new ReportTemplateServiceImpl(reportTemplateLogic);
-    }
-
-    @ConditionalOnMissingBean
-    @Bean
     public RoleService roleService(final RoleLogic roleLogic) {
         return new RoleServiceImpl(roleLogic);
     }
@@ -480,6 +498,7 @@ public class IdRepoRESTCXFContext {
     public SyncopeService syncopeService(
             final Bus bus,
             final SyncopeLogic syncopeLogic,
+            @Qualifier("batchExecutor")
             final ThreadPoolTaskExecutor batchExecutor,
             final BatchDAO batchDAO,
             final EntityFactory entityFactory) {

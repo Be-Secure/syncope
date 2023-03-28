@@ -19,8 +19,8 @@
 package org.apache.syncope.core.provisioning.java.job;
 
 import java.time.OffsetDateTime;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 import org.apache.syncope.common.lib.types.AuditElements;
 import org.apache.syncope.common.lib.types.TaskType;
 import org.apache.syncope.core.persistence.api.dao.TaskDAO;
@@ -29,16 +29,21 @@ import org.apache.syncope.core.persistence.api.entity.task.SchedTask;
 import org.apache.syncope.core.persistence.api.entity.task.TaskExec;
 import org.apache.syncope.core.persistence.api.entity.task.TaskUtilsFactory;
 import org.apache.syncope.core.provisioning.api.AuditManager;
+import org.apache.syncope.core.provisioning.api.data.TaskDataBinder;
+import org.apache.syncope.core.provisioning.api.event.JobStatusEvent;
 import org.apache.syncope.core.provisioning.api.job.JobManager;
 import org.apache.syncope.core.provisioning.api.job.SchedTaskJobDelegate;
 import org.apache.syncope.core.provisioning.api.notification.NotificationManager;
 import org.apache.syncope.core.provisioning.api.utils.ExceptionUtils2;
+import org.apache.syncope.core.spring.security.SecureRandomUtils;
 import org.apache.syncope.core.spring.security.SecurityProperties;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 public abstract class AbstractSchedTaskJobDelegate<T extends SchedTask> implements SchedTaskJobDelegate {
@@ -46,7 +51,7 @@ public abstract class AbstractSchedTaskJobDelegate<T extends SchedTask> implemen
     protected static final Logger LOG = LoggerFactory.getLogger(SchedTaskJobDelegate.class);
 
     @Autowired
-    private SecurityProperties securityProperties;
+    protected SecurityProperties securityProperties;
 
     protected TaskType taskType;
 
@@ -70,6 +75,9 @@ public abstract class AbstractSchedTaskJobDelegate<T extends SchedTask> implemen
     @Autowired
     protected TaskUtilsFactory taskUtilsFactory;
 
+    @Autowired
+    protected TaskDataBinder taskDataBinder;
+
     /**
      * Notification manager.
      */
@@ -82,15 +90,16 @@ public abstract class AbstractSchedTaskJobDelegate<T extends SchedTask> implemen
     @Autowired
     protected AuditManager auditManager;
 
-    protected final AtomicReference<String> status = new AtomicReference<>();
+    @Autowired
+    protected ApplicationEventPublisher publisher;
 
     protected boolean interrupt;
 
     protected boolean interrupted;
 
-    @Override
-    public String currentStatus() {
-        return status.get();
+    protected void setStatus(final String status) {
+        Objects.requireNonNull(task, "Task cannot be undefined");
+        publisher.publishEvent(new JobStatusEvent(this, taskDataBinder.buildRefDesc(task), status));
     }
 
     @Override
@@ -124,6 +133,13 @@ public abstract class AbstractSchedTaskJobDelegate<T extends SchedTask> implemen
             return;
         }
 
+        boolean manageOperationId = Optional.ofNullable(MDC.get(OPERATION_ID)).
+                map(operationId -> false).
+                orElseGet(() -> {
+                    MDC.put(OPERATION_ID, SecureRandomUtils.generateRandomUUID().toString());
+                    return true;
+                });
+
         String executor = Optional.ofNullable(context.getMergedJobDataMap().getString(JobManager.EXECUTOR_KEY)).
                 orElse(securityProperties.getAdminUser());
         TaskExec<SchedTask> execution = taskUtilsFactory.getInstance(taskType).newTaskExec();
@@ -131,13 +147,14 @@ public abstract class AbstractSchedTaskJobDelegate<T extends SchedTask> implemen
         execution.setTask(task);
         execution.setExecutor(executor);
 
-        status.set("Initialization completed");
+        setStatus("Initialization completed");
 
         AuditElements.Result result;
 
         try {
             execution.setMessage(doExecute(dryRun, executor, context));
             execution.setStatus(TaskJob.Status.SUCCESS.name());
+
             result = AuditElements.Result.SUCCESS;
         } catch (JobExecutionException e) {
             LOG.error("While executing task {}", taskKey, e);
@@ -153,7 +170,7 @@ public abstract class AbstractSchedTaskJobDelegate<T extends SchedTask> implemen
         }
         task = (T) taskDAO.save(task);
 
-        status.set("Done");
+        setStatus(null);
 
         notificationManager.createTasks(
                 executor,
@@ -174,6 +191,10 @@ public abstract class AbstractSchedTaskJobDelegate<T extends SchedTask> implemen
                 result,
                 task,
                 null);
+
+        if (manageOperationId) {
+            MDC.remove(OPERATION_ID);
+        }
     }
 
     /**
