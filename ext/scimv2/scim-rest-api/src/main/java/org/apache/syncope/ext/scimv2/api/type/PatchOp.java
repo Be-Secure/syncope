@@ -16,17 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.syncope.wa.starter.mapping;
+package org.apache.syncope.ext.scimv2.api.type;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import org.apache.syncope.common.lib.policy.TicketExpirationPolicyConf;
+public enum PatchOp {
+    add,
+    replace,
+    remove;
 
-@Target({ ElementType.TYPE })
-@Retention(RetentionPolicy.RUNTIME)
-public @interface TicketExpirationMapFor {
-
-    Class<? extends TicketExpirationPolicyConf> ticketExpirationPolicyConfClass();
 }

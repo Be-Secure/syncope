@@ -400,15 +400,15 @@ under the License.
     <connid.version>1.6.0.0-SNAPSHOT</connid.version>
     <connid.soap.version>1.5.0-SNAPSHOT</connid.soap.version>
     <connid.rest.version>1.1.0-SNAPSHOT</connid.rest.version>
-    <connid.db.version>2.3.0-SNAPSHOT</connid.db.version>
+    <connid.db.version>2.3.0</connid.db.version>
     <connid.csvdir.version>0.8.9</connid.csvdir.version>
     <connid.ldap.version>1.5.7</connid.ldap.version>
     <connid.ad.version>1.3.8</connid.ad.version>
     <connid.googleapps.version>1.4.3</connid.googleapps.version>
     <connid.azure.version>2.0.0</connid.azure.version>
     <connid.scim.version>1.0.0-SNAPSHOT</connid.scim.version>
-    <connid.servicenow.version>1.0.1</connid.servicenow.version>
-    <connid.okta.version>2.1.2</connid.okta.version>
+    <connid.servicenow.version>1.0.2</connid.servicenow.version>
+    <connid.okta.version>3.0.0</connid.okta.version>
     <connid.cmd.version>0.5</connid.cmd.version>
 
     <cxf.version>4.0.1-SNAPSHOT</cxf.version>
@@ -423,12 +423,12 @@ under the License.
 
     <jasypt.version>1.9.3</jasypt.version>
 
-    <groovy.version>4.0.10</groovy.version>
+    <groovy.version>4.0.11</groovy.version>
 
     <flowable.version>7.0.0.M1</flowable.version>
     <flowable-old.version>6.8.0</flowable-old.version>
 
-    <elasticsearch.version>8.6.2</elasticsearch.version>
+    <elasticsearch.version>8.7.0</elasticsearch.version>
 
     <disruptor.version>3.4.4</disruptor.version>
     
@@ -458,8 +458,8 @@ under the License.
 
     <wicket.version>10.0.0-M1-SNAPSHOT</wicket.version>
     <wicketstuff.version>10.0.0-SNAPSHOT</wicketstuff.version>
-    <wicket-jqueryui.version>9.12.0</wicket-jqueryui.version>
-    <wicket-bootstrap.version>5.0.6</wicket-bootstrap.version>
+    <wicket-jqueryui.version>10.0.0-SNAPSHOT</wicket-jqueryui.version>
+    <wicket-bootstrap.version>7.0.0-SNAPSHOT</wicket-bootstrap.version>
     <wicket-spring-boot.version>4.0.0-SNAPSHOT</wicket-spring-boot.version>
 
     <antlr4.version>4.12.0</antlr4.version>
@@ -1672,7 +1672,7 @@ under the License.
         <plugin>
           <groupId>io.fabric8</groupId>
           <artifactId>docker-maven-plugin</artifactId>
-          <version>0.42.0</version>
+          <version>0.42.1</version>
         </plugin>
 
         <plugin>
@@ -1721,7 +1721,7 @@ under the License.
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
-        <version>3.2.1</version>
+        <version>3.3.0</version>
         <executions>
           <execution>
             <id>default-cli</id>
@@ -2060,7 +2060,7 @@ under the License.
           <plugin>
             <groupId>org.cyclonedx</groupId>
             <artifactId>cyclonedx-maven-plugin</artifactId>
-            <version>2.7.5</version>
+            <version>2.7.6</version>
             <executions>
               <execution>
                 <phase>package</phase>

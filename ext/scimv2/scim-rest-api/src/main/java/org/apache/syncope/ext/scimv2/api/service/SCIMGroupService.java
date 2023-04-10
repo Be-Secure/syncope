@@ -16,17 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.syncope.wa.starter.mapping;
+package org.apache.syncope.ext.scimv2.api.service;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import org.apache.syncope.common.lib.policy.AttrReleasePolicyConf;
+import jakarta.ws.rs.Path;
+import org.apache.syncope.ext.scimv2.api.data.SCIMGroup;
 
-@Target({ ElementType.TYPE })
-@Retention(RetentionPolicy.RUNTIME)
-public @interface AttrReleaseMapFor {
-
-    Class<? extends AttrReleasePolicyConf> attrReleasePolicyConfClass();
+@Path("v2/Groups")
+public interface SCIMGroupService extends SCIMResourceService<SCIMGroup> {
 }

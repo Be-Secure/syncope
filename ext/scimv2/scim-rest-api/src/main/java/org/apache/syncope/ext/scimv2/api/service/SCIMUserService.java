@@ -16,17 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.syncope.wa.starter.mapping;
+package org.apache.syncope.ext.scimv2.api.service;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import org.apache.syncope.common.lib.policy.AccessPolicyConf;
+import jakarta.ws.rs.Path;
+import org.apache.syncope.ext.scimv2.api.data.SCIMUser;
 
-@Target({ ElementType.TYPE })
-@Retention(RetentionPolicy.RUNTIME)
-public @interface AccessMapFor {
-
-    Class<? extends AccessPolicyConf> accessPolicyConfClass();
+@Path("v2/Users")
+public interface SCIMUserService extends SCIMResourceService<SCIMUser> {
 }

@@ -16,17 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.syncope.wa.starter.mapping;
+package org.apache.syncope.ext.scimv2.api.data;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import org.apache.syncope.common.lib.policy.AuthPolicyConf;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
+import org.apache.syncope.ext.scimv2.api.type.Resource;
 
-@Target({ ElementType.TYPE })
-@Retention(RetentionPolicy.RUNTIME)
-public @interface AuthMapFor {
+public class SCIMPatchOp extends SCIMBean {
 
-    Class<? extends AuthPolicyConf> authPolicyConfClass();
+    private static final long serialVersionUID = 3957352317667344898L;
+
+    private final List<String> schemas = List.of(Resource.PatchOp.schema());
+
+    @JsonProperty("Operations")
+    private List<SCIMPatchOperation> operations;
+
+    public List<String> getSchemas() {
+        return schemas;
+    }
+
+    public List<SCIMPatchOperation> getOperations() {
+        return operations;
+    }
+
+    public void setOperations(final List<SCIMPatchOperation> operations) {
+        this.operations = operations;
+    }
 }

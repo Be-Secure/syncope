@@ -16,17 +16,36 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.syncope.wa.starter.mapping;
+package org.apache.syncope.common.lib.scim;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import org.apache.syncope.common.lib.to.ClientAppTO;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import java.io.Serializable;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
-@Target({ ElementType.TYPE })
-@Retention(RetentionPolicy.RUNTIME)
-public @interface ClientAppMapFor {
+public class SCIMGroupConf implements Serializable {
 
-    Class<? extends ClientAppTO> clientAppClass();
+    private static final long serialVersionUID = -2700011089067219156L;
+
+    private String externalId;
+
+    @JsonIgnore
+    public Map<String, String> asMap() {
+        Map<String, String> map = new HashMap<>();
+
+        if (externalId != null) {
+            map.put("externalId", externalId);
+        }
+
+        return Collections.unmodifiableMap(map);
+    }
+
+    public String getExternalId() {
+        return externalId;
+    }
+
+    public void setExternalId(final String externalId) {
+        this.externalId = externalId;
+    }
 }
